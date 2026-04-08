@@ -676,7 +676,7 @@ def main():
                 continue
 
             internal_id = stock_map.get(code)
-            if not internal_id:
+            if not internal_id and args.doc_type != "prospectus":
                 log.warning(f"  {code} ({company[:30]}): no ID mapping")
                 fail += 1
                 continue
