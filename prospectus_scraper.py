@@ -233,60 +233,22 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
                             break
 
                 # Step 2: Wait for headline category dropdown to become enabled/visible
-                page.wait_for_timeout(2000)  # give page time to re-render
-
-                # Diagnostic: what does the dropdown area look like NOW?
-                post_switch = page.evaluate("""() => {
-                    const info = [];
-                    // Check all combobox-fields after search type switch
-                    document.querySelectorAll('a.combobox-field').forEach(el => {
-                        info.push({
-                            text: el.innerText.trim().substring(0, 40),
-                            value: el.getAttribute('data-value') || el.getAttribute('value') || '',
-                            visible: el.offsetParent !== null,
-                            parent: el.parentElement?.className?.substring(0, 50) || '',
-                            grandparent: el.parentElement?.parentElement?.className?.substring(0, 50) || ''
-                        });
-                    });
-                    // Also check tierOneId
-                    const t1 = document.getElementById('tierOneId');
-                    return {
-                        fields: info,
-                        tierOneId: t1?.value || 'NOT FOUND',
-                        tierOneDisabled: t1?.disabled || false
-                    };
-                }""")
-                log.info(f"  Post-switch tierOneId={post_switch.get('tierOneId')}")
-                for f in post_switch.get('fields', []):
-                    log.info(f"    A.combobox-field: text='{f['text']}' value='{f['value']}' "
-                             f"visible={f['visible']} parent='{f['parent'][:30]}'")
-
-                # Take screenshot after switch
-                try:
-                    page.screenshot(path="/tmp/hkex_debug2.png", full_page=False)
-                    log.info(f"  Screenshot: /tmp/hkex_debug2.png")
-                except Exception:
-                    pass
+                page.wait_for_timeout(2000)
 
                 # Try multiple selectors — page may restructure after search type change
                 tier1_trigger = None
-                for sel in ['.tier1-wrap .combobox-field',
-                            '.searchType-Categroy .combobox-field',
-                            '.tier1-wrap a.combobox-field']:
+                # After switch, the visible headline category dropdown has value="-2" text="ALL"
+                all_fields = page.query_selector_all('a.combobox-field')
+                for f in all_fields:
                     try:
-                        tier1_trigger = page.wait_for_selector(sel, state="visible", timeout=5000)
-                        if tier1_trigger:
+                        val = f.get_attribute('data-value') or f.get_attribute('value') or ''
+                        txt = f.inner_text().strip()
+                        if f.is_visible() and val == '-2' and txt.upper() == 'ALL':
+                            tier1_trigger = f
+                            log.info(f"  Found headline dropdown: text='{txt}' value='{val}'")
                             break
                     except Exception:
                         continue
-
-                if not tier1_trigger:
-                    # Last resort: find any combobox-field that shows "All" and isn't disabled
-                    all_fields = page.query_selector_all('a.combobox-field')
-                    for f in all_fields:
-                        if f.is_visible() and f.get_attribute('data-value') == '-1':
-                            tier1_trigger = f
-                            break
 
                 if tier1_trigger:
                     tier1_trigger.click()
