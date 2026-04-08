@@ -342,6 +342,14 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--date-margin", type=int, default=7,
                         help="Days around prospectus date to search (default: 7)")
+    parser.add_argument("--filter", type=str, default="smart",
+                        choices=["all", "smart", "top-n"],
+                        help="Download filter: all=everything, smart=skip sub-MB files, "
+                             "top-n=largest N files only (default: smart)")
+    parser.add_argument("--min-size-mb", type=float, default=1.0,
+                        help="Min file size in MB for 'smart' filter (default: 1.0)")
+    parser.add_argument("--top-n", type=int, default=3,
+                        help="Number of largest files to keep for 'top-n' filter (default: 3)")
     args = parser.parse_args()
 
     if args.dry_run:
@@ -411,12 +419,36 @@ def main():
             # Search
             docs = search_listing_docs(browser, code, internal_id, date_from, date_to)
 
+            # Filter to PDFs only
+            pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
+
+            # Apply size filter if not downloading everything
+            if args.filter != "all" and pdf_docs:
+                log.info(f"  Checking file sizes for {len(pdf_docs)} PDFs...")
+                for doc in pdf_docs:
+                    try:
+                        resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
+                        doc["size"] = int(resp.headers.get("Content-Length", 0))
+                    except Exception:
+                        doc["size"] = 0
+                    time.sleep(0.2)
+
+                if args.filter == "smart":
+                    min_bytes = int(args.min_size_mb * 1024 * 1024)
+                    before = len(pdf_docs)
+                    pdf_docs = [d for d in pdf_docs if d["size"] >= min_bytes]
+                    log.info(f"  Smart filter (≥{args.min_size_mb}MB): {before} → {len(pdf_docs)} files")
+
+                elif args.filter == "top-n":
+                    pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
+                    pdf_docs = pdf_docs[:args.top_n]
+                    log.info(f"  Top-{args.top_n} largest: "
+                             + ", ".join(f"{d['url'].split('/')[-1]}({d['size']/1024/1024:.1f}MB)" for d in pdf_docs))
+
             # Download
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
-            for doc in docs:
+            for doc in pdf_docs:
                 url = doc["url"]
-                if not url.endswith(".pdf"):
-                    continue
                 filename = url.split("/")[-1]
                 dest = DOWNLOAD_DIR / f"{code}_{safe_name}" / filename
                 if download_pdf(url, dest, state):

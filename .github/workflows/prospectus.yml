@@ -22,6 +22,25 @@ on:
         required: false
         default: false
         type: boolean
+      filter:
+        description: 'Download filter: all / smart (skip <1MB) / top-n (largest N only)'
+        required: false
+        default: 'smart'
+        type: choice
+        options:
+          - all
+          - smart
+          - top-n
+      min_size_mb:
+        description: 'Min file size in MB (for smart filter)'
+        required: false
+        default: '1.0'
+        type: string
+      top_n:
+        description: 'Keep N largest files per stock (for top-n filter)'
+        required: false
+        default: '3'
+        type: string
 
 permissions:
   contents: write
@@ -64,6 +83,9 @@ jobs:
             ARGS="$ARGS --stock ${{ github.event.inputs.stock }}"
           fi
           ARGS="$ARGS --date-margin ${{ github.event.inputs.date_margin || '7' }}"
+          ARGS="$ARGS --filter ${{ github.event.inputs.filter || 'smart' }}"
+          ARGS="$ARGS --min-size-mb ${{ github.event.inputs.min_size_mb || '1.0' }}"
+          ARGS="$ARGS --top-n ${{ github.event.inputs.top_n || '3' }}"
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
