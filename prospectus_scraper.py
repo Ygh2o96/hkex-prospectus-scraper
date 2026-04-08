@@ -375,8 +375,14 @@ def _manage_cron(args):
 
     cron_cmd = " ".join(cmd_parts)
 
-    # Daily at 18:00 (after HK market close)
-    cron_line = f'0 18 * * * {cron_cmd} >> {Path(output_dir).expanduser()}/cron.log 2>&1 {CRON_TAG}'
+    # Parse cron time
+    try:
+        hh, mm = args.cron_time.split(":")
+        cron_hour, cron_min = int(hh), int(mm)
+    except Exception:
+        cron_hour, cron_min = 11, 0
+
+    cron_line = f'{cron_min} {cron_hour} * * * {cron_cmd} >> {Path(output_dir).expanduser()}/cron.log 2>&1 {CRON_TAG}'
 
     # Read existing crontab
     result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
@@ -390,7 +396,7 @@ def _manage_cron(args):
                           capture_output=True, text=True)
 
     if proc.returncode == 0:
-        log.info(f"Cron job installed (daily at 18:00):")
+        log.info(f"Cron job installed (daily at {args.cron_time}):")
         log.info(f"  {cron_line}")
         log.info(f"\nOutputs → {output_dir}")
         log.info(f"Logs   → {Path(output_dir).expanduser()}/cron.log")
@@ -458,7 +464,9 @@ def main():
 
     # Cron management
     parser.add_argument("--install-cron", action="store_true",
-                        help="Install a daily cron job and exit. Combines with other flags to set the cron command.")
+                        help="Install a daily cron job and exit.")
+    parser.add_argument("--cron-time", type=str, default="11:00",
+                        help="Time for cron job in HH:MM (default: 11:00)")
     parser.add_argument("--remove-cron", action="store_true",
                         help="Remove the installed cron job and exit")
     args = parser.parse_args()
