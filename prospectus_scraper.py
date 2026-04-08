@@ -50,6 +50,48 @@ ACTIVESTOCK_URL = f"{BASE_URL}/ncms/script/eds/activestock_sehk_e.json"
 TITLESEARCH_URL = f"{BASE_URL}/search/titlesearch.xhtml"
 LISTING_DOCS_CATEGORY = "30000"
 
+# ── HKEX Headline Categories (t1code values) ──
+# Source: https://www1.hkexnews.hk/ncms/script/eds/tierone_e.json
+HKEX_CATEGORIES = {
+    "announcements":    ("10000", "Announcements and Notices"),
+    "circulars":        ("20000", "Circulars"),
+    "listing-docs":     ("30000", "Listing Documents"),
+    "financials":       ("40000", "Financial Statements/ESG Information"),
+    "nddr":             ("50000", "Next Day Disclosure Returns"),
+    "monthly-returns":  ("51500", "Monthly Returns"),
+    "proxy-forms":      ("52000", "Proxy Forms"),
+    "company-info":     ("53000", "Company Information Sheet"),
+    "constitutional":   ("54000", "Constitutional Documents"),
+    "takeovers":        ("55000", "Takeovers Code - dealing disclosures"),
+    "docs-on-display":  ("56000", "Documents on Display"),
+    "debt":             ("70000", "Debt and Structured Products"),
+    "etf":              ("80000", "Trading Information of ETFs"),
+    "regulatory":       ("90000", "Regulatory Announcement & News"),
+    "ap-phip":          ("91000", "Application Proofs, OC Announcements and PHIPs"),
+}
+
+# Key sub-categories (t2code) for research
+HKEX_SUBCATEGORIES = {
+    "connected-txn":       ("11200", "Connected Transaction"),
+    "continuing-conn-txn": ("11300", "Continuing Connected Transaction"),
+    "inside-info":         ("19750", "Inside Information"),
+    "profit-warning":      ("13500", "Profit Warning"),
+    "major-txn":           ("16300", "Major Transaction"),
+    "very-sub-acq":        ("16800", "Very Substantial Acquisition"),
+    "very-sub-disp":       ("16900", "Very Substantial Disposal"),
+    "reverse-takeover":    ("16400", "Reverse Takeover"),
+    "privatisation":       ("17600", "Privatisation/Withdrawal of Listing"),
+    "spin-off":            ("17700", "Spin-off"),
+    "share-buyback":       ("50100", "Share Buyback"),
+    "final-results":       ("13300", "Final Results"),
+    "interim-results":     ("13400", "Interim Results"),
+    "prospectus":          ("30700", "Offer for Subscription"),
+    "rights-issue":        ("18500", "Rights Issue"),
+    "open-offer":          ("18460", "Open Offer"),
+    "placing":             ("18480", "Placing"),
+    "allotment-results":   ("15100", "Allotment Results"),
+}
+
 # HKEX Title Search tier2 subcategory codes (under tier1=30000 Listing Documents)
 # Source: /ncms/script/eds/tiertwo_e.json
 TIER2_CODES = {
@@ -189,12 +231,15 @@ def load_stock_map() -> dict:
 # Playwright search
 # ---------------------------------------------------------------------------
 
-def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict]:
+def search_listing_docs(browser, stock_code: str, internal_id: int,
+                        t1code: str = None, t2code: str = None) -> list[dict]:
     """
-    Plan B: intercept the JSF form POST and inject tierOneId=30000.
-    The JSF form ignores all DOM manipulation — the only way to filter
-    by "Listing Documents" is to modify the POST body in flight.
+    Automate HKEX Title Search with POST interception.
+    t1code: headline category (default: 30000 = Listing Documents)
+    t2code: sub-category (default: None = all within t1code)
     """
+    _t1 = t1code or LISTING_DOCS_CATEGORY
+    _t2 = t2code  # None means don't filter by subcategory
     page = browser.new_page()
     page.set_default_timeout(60000)
     results = []
@@ -205,12 +250,11 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
             req = route.request
             if req.method == "POST" and "titlesearch" in req.url:
                 body = req.post_data or ""
-                # The actual field names (from POST body diagnostic):
-                #   t1code=-2  → t1code=30000 (Listing Documents)
-                #   searchType=0 → searchType=1 (Headline Category mode)
-                body = re.sub(r't1code=[^&]*', f't1code={LISTING_DOCS_CATEGORY}', body)
+                body = re.sub(r't1code=[^&]*', f't1code={_t1}', body)
                 body = re.sub(r'searchType=0', 'searchType=1', body)
-                log.info(f"  [POST] t1code={LISTING_DOCS_CATEGORY}, searchType=1")
+                if _t2:
+                    body = re.sub(r't2code=[^&]*', f't2code={_t2}', body)
+                log.info(f"  [POST] t1code={_t1}" + (f", t2code={_t2}" if _t2 else ""))
                 route.continue_(post_data=body)
             else:
                 route.continue_()
@@ -520,6 +564,14 @@ def main():
                              "all-listed=all listed-co Listing Documents, "
                              "ap-phip=only AP/PHIP (sehk*/gem* files), "
                              "everything=no filter (default: prospectus)")
+    parser.add_argument("--category", type=str, default=None,
+                        help="HKEX headline category (t1code). Use name from --list-categories "
+                             "or raw code (e.g. 30000). Overrides --doc-type.")
+    parser.add_argument("--subcategory", type=str, default=None,
+                        help="HKEX sub-category (t2code). Use name from --list-categories "
+                             "or raw code (e.g. 16400 for Reverse Takeover)")
+    parser.add_argument("--list-categories", action="store_true",
+                        help="Print all HKEX categories and exit")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Override download directory (default: downloads/prospectuses)")
 
@@ -531,6 +583,45 @@ def main():
     parser.add_argument("--remove-cron", action="store_true",
                         help="Remove the installed cron job and exit")
     args = parser.parse_args()
+
+    # ---- List categories ----
+    if args.list_categories:
+        print("\n── HKEX Headline Categories (--category) ──")
+        for key, (code, name) in sorted(HKEX_CATEGORIES.items()):
+            print(f"  {key:20s}  {code}  {name}")
+        print("\n── Key Sub-categories (--subcategory) ──")
+        for key, (code, name) in sorted(HKEX_SUBCATEGORIES.items()):
+            print(f"  {key:24s}  {code}  {name}")
+        return
+
+    # ---- Resolve category/subcategory ----
+    t1code = None  # None = use default based on --doc-type
+    t2code = None
+    if args.category:
+        if args.category in HKEX_CATEGORIES:
+            t1code = HKEX_CATEGORIES[args.category][0]
+        elif args.category.isdigit():
+            t1code = args.category
+        else:
+            print(f"Unknown category '{args.category}'. Use --list-categories.")
+            return
+        log.info(f"Category override: t1code={t1code}")
+    if args.subcategory:
+        if args.subcategory in HKEX_SUBCATEGORIES:
+            t2code = HKEX_SUBCATEGORIES[args.subcategory][0]
+        elif args.subcategory.isdigit():
+            t2code = args.subcategory
+        else:
+            print(f"Unknown subcategory '{args.subcategory}'. Use --list-categories.")
+            return
+        # Infer t1code from subcategory if not explicitly set
+        if not t1code:
+            t1code = t2code[:2] + "000" if len(t2code) == 5 else t2code
+        log.info(f"Subcategory override: t2code={t2code}")
+
+    # Store resolved codes for the route handler
+    args._t1code = t1code
+    args._t2code = t2code
 
     # ---- Cron management ----
     if args.install_cron or args.remove_cron:
@@ -654,7 +745,8 @@ def main():
             log.info(f"\n[{i+1}/{len(all_listings)}] {code} {company[:40]} (prosp: {prosp_date})")
 
             # Playwright search (category=Listing Documents)
-            docs = search_listing_docs(browser, code, internal_id)
+            docs = search_listing_docs(browser, code, internal_id,
+                                       t1code=args._t1code, t2code=args._t2code)
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
             before = len(pdf_docs)
 
