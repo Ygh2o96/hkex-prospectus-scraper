@@ -649,34 +649,36 @@ def main():
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # ── DOC TYPE FILTER ──
-            # Each result has: headline (subcategory), title (link text)
-            # headline: "Offer for Subscription" (may be empty if DOM parse fails)
-            # title: "Global Offering (22MB)" or "GLOBAL OFFERING" etc.
-            PROSPECTUS_KEYWORDS_HL = {"offer for subscription", "offer for sale",
-                                      "placing of securities of a class new to listing"}
-            PROSPECTUS_KEYWORDS_TITLE = {"global offering", "prospectus", "招股",
-                                         "全球發售", "全球发售"}
+            # ── DOC TYPE FILTER (fast, no HTTP needed) ──
+            # Filename patterns:
+            #   sehk*.pdf / gem*.pdf  → AP system (Application Proof, PHIP)
+            #   YYYYMMDD*.pdf         → Listed company doc (prospectus, allotment, etc.)
+            # Key insight: prospectus filename starts with its publication date (from NLR)
 
             before = len(pdf_docs)
             if args.doc_type == "prospectus":
-                filtered = []
-                for d in pdf_docs:
-                    hl = d.get("headline", "").lower().strip()
-                    title = d.get("title", "").lower().strip()
-                    # Match by headline subcategory
-                    if hl and hl in PROSPECTUS_KEYWORDS_HL:
-                        filtered.append(d)
-                        continue
-                    # Match by link title text
-                    if any(kw in title for kw in PROSPECTUS_KEYWORDS_TITLE):
-                        filtered.append(d)
-                        continue
-                pdf_docs = filtered
-                if not filtered and before > 0:
-                    log.warning(f"  ⚠ No prospectus matched by headline/title. "
-                                f"Headlines: {set(d.get('headline','') for d in docs)}")
-                    log.warning(f"    Titles: {[d.get('title','')[:40] for d in docs[:5]]}")
+                # Match by NLR prospectus date prefix in filename
+                if prosp_date:
+                    date_prefix = prosp_date.replace("-", "")  # "2023-12-27" → "20231227"
+                    pdf_docs = [d for d in pdf_docs
+                                if d["url"].split("/")[-1].startswith(date_prefix)]
+                    log.info(f"  Date-prefix filter ({date_prefix}*): {before} → {len(pdf_docs)}")
+                    # If multiple matches on same date, keep largest
+                    if len(pdf_docs) > 1:
+                        for doc in pdf_docs:
+                            try:
+                                resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
+                                doc["size"] = int(resp.headers.get("Content-Length", 0))
+                            except Exception:
+                                doc["size"] = 0
+                        pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
+                        pdf_docs = pdf_docs[:1]
+                        log.info(f"  Largest: {pdf_docs[0]['url'].split('/')[-1]} "
+                                 f"({pdf_docs[0]['size']/1024/1024:.1f}MB)")
+                else:
+                    log.warning(f"  No prospectus date in NLR — skipping")
+                    pdf_docs = []
+
             elif args.doc_type == "all-listed":
                 pdf_docs = [d for d in pdf_docs
                             if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
