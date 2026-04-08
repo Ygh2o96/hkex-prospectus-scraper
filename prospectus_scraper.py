@@ -208,31 +208,80 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
         # Verify the Headline Category dropdown shows "Listing Documents"
         # If URL param didn't stick, click the dropdown and select it
         tier1_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
-        log.debug(f"  tierOneId value: {tier1_val}")
         if tier1_val != LISTING_DOCS_CATEGORY:
-            log.info(f"  Category not set ({tier1_val}), clicking dropdown...")
-            # Try clicking the headline category dropdown and selecting Listing Documents
+            log.info(f"  Category not set ({tier1_val}), diagnosing dropdown...")
+
+            # Dump dropdown HTML for debugging
+            dropdown_info = page.evaluate("""() => {
+                const info = {};
+                // Find all combobox/dropdown-like elements
+                const selectors = [
+                    '.combobox-field', '.droplist-field', 'select',
+                    '[class*="combo"]', '[class*="drop"]', '[class*="filter"]'
+                ];
+                const elements = [];
+                selectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(el => {
+                        if (el.offsetParent !== null) {  // visible only
+                            elements.push({
+                                tag: el.tagName,
+                                class: el.className.substring(0, 80),
+                                text: el.innerText.substring(0, 60),
+                                value: el.getAttribute('data-value') || el.value || '',
+                                id: el.id || ''
+                            });
+                        }
+                    });
+                });
+                info.dropdowns = elements;
+
+                // Also get the filter container HTML
+                const filterEl = document.querySelector('.filter__container-title-search, .filter-container');
+                info.filterHTML = filterEl ? filterEl.innerHTML.substring(0, 2000) : 'NOT FOUND';
+                return info;
+            }""")
+
+            log.info(f"  Dropdowns found: {len(dropdown_info.get('dropdowns', []))}")
+            for dd in dropdown_info.get('dropdowns', []):
+                log.info(f"    <{dd['tag']} class='{dd['class'][:40]}' "
+                         f"text='{dd['text'][:30]}' value='{dd['value'][:20]}'>")
+
+            # Save screenshot for visual debugging
             try:
-                # Find and click the headline category dropdown
-                dropdowns = page.query_selector_all(".combobox-field, .droplist-field, select")
-                for dd in dropdowns:
-                    text = dd.inner_text().strip().lower() if dd.is_visible() else ""
-                    if "headline" in text or "category" in text or "all" in text.lower():
-                        dd.click()
-                        page.wait_for_timeout(500)
-                        # Look for "Listing Documents" option
-                        options = page.query_selector_all(
-                            ".droplist-item, .combobox-item, option, li[data-value]")
-                        for opt in options:
-                            opt_text = opt.inner_text().strip()
-                            if "listing documents" in opt_text.lower():
-                                opt.click()
-                                log.info(f"  Selected: {opt_text}")
-                                page.wait_for_timeout(1000)
+                page.screenshot(path="/tmp/hkex_debug.png", full_page=False)
+                log.info(f"  Screenshot saved: /tmp/hkex_debug.png")
+            except Exception:
+                pass
+
+            # Try to click the headline category dropdown with better selectors
+            try:
+                # Strategy: find the dropdown that currently shows "ALL" or is empty
+                # and click it, then select "Listing Documents"
+                clicked = False
+                for dd in dropdown_info.get('dropdowns', []):
+                    if dd['text'].strip().upper() in ('ALL', '', 'HEADLINE CATEGORY'):
+                        sel = f"#{dd['id']}" if dd['id'] else f".{dd['class'].split()[0]}"
+                        el = page.query_selector(sel)
+                        if el and el.is_visible():
+                            el.click()
+                            page.wait_for_timeout(500)
+                            # Now look for Listing Documents in any visible list
+                            items = page.query_selector_all(
+                                '.droplist-item, .combobox-item, li[data-value], '
+                                '.autocomplete-suggestion, option')
+                            for item in items:
+                                if "listing documents" in item.inner_text().lower():
+                                    item.click()
+                                    clicked = True
+                                    log.info(f"  ✓ Selected 'Listing Documents' from dropdown")
+                                    page.wait_for_timeout(1000)
+                                    break
+                            if clicked:
                                 break
-                        break
+                if not clicked:
+                    log.warning(f"  ⚠ Could not select Listing Documents from dropdown")
             except Exception as e:
-                log.debug(f"  Dropdown interaction failed: {e}")
+                log.warning(f"  Dropdown interaction error: {e}")
 
         # Click search button
         for sel in ["a.filter__btn-apply:not(.btn-disable)",
