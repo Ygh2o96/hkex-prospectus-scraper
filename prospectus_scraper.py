@@ -209,30 +209,43 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
         # If URL param didn't stick, click the dropdown and select it
         tier1_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
         if tier1_val != LISTING_DOCS_CATEGORY:
-            log.info(f"  Category={tier1_val}, selecting 'Listing Documents'...")
+            log.info(f"  Category={tier1_val}, fixing search type + category...")
             try:
-                # The Headline Category dropdown is inside .tier1-wrap
-                # Click the <A class="combobox-field"> inside it to open
+                # Step 1: Switch search type from "ALL" to enable headline category
+                # The search type dropdown (class searchType) shows "ALL" (rbAll)
+                # which DISABLES the headline category dropdown.
+                # Need to select the post-2007 option that enables it.
+                search_type_dd = page.query_selector('.searchType .combobox-field')
+                if search_type_dd:
+                    search_type_dd.click()
+                    page.wait_for_timeout(500)
+                    # Find the option for "Headline Category" / post-2007
+                    st_items = page.query_selector_all('.searchType .droplist-item')
+                    if not st_items:
+                        st_items = page.query_selector_all('.droplist-item')
+                    for item in st_items:
+                        txt = item.inner_text().strip().lower()
+                        if item.is_visible() and ("headline" in txt or "2007" in txt
+                                                   or "after" in txt or "category" in txt):
+                            item.click()
+                            log.info(f"  ✓ Search type → '{item.inner_text().strip()[:40]}'")
+                            page.wait_for_timeout(1000)
+                            break
+
+                # Step 2: Now the headline category dropdown should be enabled
                 tier1_trigger = page.query_selector('.tier1-wrap .combobox-field')
                 if tier1_trigger:
                     tier1_trigger.click()
                     page.wait_for_timeout(800)
-
-                    # Now find "Listing Documents" in the opened dropdown items
-                    items = page.query_selector_all('.tier1-wrap .droplist-item')
-                    if not items:
-                        # Try broader selector — items might be outside .tier1-wrap
-                        items = page.query_selector_all('.droplist-item')
+                    items = page.query_selector_all('.droplist-item')
                     for item in items:
                         if item.is_visible() and "listing documents" in item.inner_text().lower():
                             item.click()
-                            log.info(f"  ✓ Selected 'Listing Documents'")
+                            log.info(f"  ✓ Category → 'Listing Documents'")
                             page.wait_for_timeout(1000)
                             break
                     else:
-                        log.warning(f"  'Listing Documents' option not found in {len(items)} items")
-                else:
-                    log.warning(f"  tier1-wrap .combobox-field not found")
+                        log.warning(f"  'Listing Documents' not found in dropdown")
             except Exception as e:
                 log.warning(f"  Dropdown error: {e}")
 
