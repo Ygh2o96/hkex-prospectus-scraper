@@ -1,28 +1,24 @@
-name: HKEX Prospectus Scraper (Listed Companies)
+name: HKEX Prospectus Scraper (Playwright)
 
 on:
   workflow_dispatch:
     inputs:
       years:
-        description: 'NLR years to scrape (space-separated, e.g. "2024 2025 2026")'
+        description: 'Years to scrape (space-separated)'
         required: true
         default: '2026'
         type: string
-      stock_codes:
-        description: 'Specific stock codes (space-separated, leave empty for all)'
+      stock:
+        description: 'Single stock code (optional, for testing)'
         required: false
-        default: ''
         type: string
-      mode:
-        description: 'Search mode'
+      date_margin:
+        description: 'Days around prospectus date to search'
         required: false
-        default: 'playwright'
-        type: choice
-        options:
-          - playwright
-          - brute-force
+        default: '7'
+        type: string
       dry_run:
-        description: 'Dry run (list targets only)'
+        description: 'Dry run (no downloads)'
         required: false
         default: false
         type: boolean
@@ -47,7 +43,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install requests openpyxl playwright
-          npx playwright install --with-deps chromium
+          python -m playwright install chromium
+          python -m playwright install-deps chromium
 
       - name: Restore state cache
         uses: actions/cache@v4
@@ -63,23 +60,17 @@ jobs:
           RATE_LIMIT_SECONDS: '2.0'
         run: |
           ARGS="--years ${{ github.event.inputs.years }}"
-
-          if [ "${{ github.event.inputs.mode }}" = "brute-force" ]; then
-            ARGS="$ARGS --brute-force-only"
+          if [ -n "${{ github.event.inputs.stock }}" ]; then
+            ARGS="$ARGS --stock ${{ github.event.inputs.stock }}"
           fi
-
-          if [ -n "${{ github.event.inputs.stock_codes }}" ]; then
-            ARGS="$ARGS --stock-codes ${{ github.event.inputs.stock_codes }}"
-          fi
-
+          ARGS="$ARGS --date-margin ${{ github.event.inputs.date_margin || '7' }}"
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
-
           echo "Running: python prospectus_scraper.py $ARGS"
           python prospectus_scraper.py $ARGS
 
-      - name: Upload downloads
+      - name: Upload prospectuses
         if: ${{ github.event.inputs.dry_run != 'true' }}
         uses: actions/upload-artifact@v4
         with:
