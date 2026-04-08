@@ -776,7 +776,7 @@ def main():
                     success += 1
 
             state.setdefault("searched", {})[search_key] = {
-                "docs_found": len(docs), "ts": datetime.utcnow().isoformat()
+                "docs_found": len(pdf_docs), "ts": datetime.utcnow().isoformat()
             }
             time.sleep(RATE_LIMIT)
 
