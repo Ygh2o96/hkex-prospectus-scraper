@@ -1,0 +1,122 @@
+name: HKEX Prospectus Scraper
+
+on:
+  # Run daily at 08:00 UTC (16:00 HKT)
+  schedule:
+    - cron: '0 8 * * *'
+
+  # Manual trigger with options
+  workflow_dispatch:
+    inputs:
+      tabs:
+        description: 'Tabs to scrape (active / listed / all)'
+        required: false
+        default: 'active'
+        type: choice
+        options:
+          - active
+          - listed
+          - all
+      boards:
+        description: 'Boards to scrape (main / gem / both)'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - main
+          - gem
+          - both
+      include_phip:
+        description: 'Include PHIP documents'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run (no downloads)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: state/
+          key: hkex-state-${{ github.ref_name }}
+          restore-keys: hkex-state-
+
+      - name: Run scraper
+        env:
+          DOWNLOAD_DIR: downloads
+          STATE_FILE: state/downloaded.json
+          RATE_LIMIT_SECONDS: '1.5'
+          MAX_WORKERS: '1'
+        run: |
+          # Build args
+          ARGS=""
+
+          TABS="${{ github.event.inputs.tabs || 'active' }}"
+          if [ "$TABS" = "all" ]; then
+            ARGS="$ARGS --tabs all"
+          elif [ "$TABS" = "listed" ]; then
+            ARGS="$ARGS --tabs listed"
+          else
+            ARGS="$ARGS --tabs active"
+          fi
+
+          BOARDS="${{ github.event.inputs.boards || 'both' }}"
+          if [ "$BOARDS" = "main" ]; then
+            ARGS="$ARGS --boards main"
+          elif [ "$BOARDS" = "gem" ]; then
+            ARGS="$ARGS --boards gem"
+          else
+            ARGS="$ARGS --boards main gem"
+          fi
+
+          if [ "${{ github.event.inputs.include_phip }}" = "true" ]; then
+            ARGS="$ARGS --include-phip"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: python scraper.py $ARGS"
+          python scraper.py $ARGS
+
+      - name: Upload downloads as artifact
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hkex-prospectuses-${{ github.run_number }}
+          path: downloads/
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit state file
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/downloaded.json
+          git diff --cached --quiet || git commit -m "chore: update download state [$(date -u +%Y-%m-%d)]"
+          git push
