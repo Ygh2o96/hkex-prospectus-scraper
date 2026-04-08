@@ -279,11 +279,9 @@ def main():
     for tab in tabs:
         for board in args.boards:
             if tab == "active":
+                endpoint_keys.append((f"active_app_{board}", board))
                 if args.include_phip:
-                    key = f"active_phip_{board}"
-                else:
-                    key = f"active_app_{board}"
-                endpoint_keys.append((key, board))
+                    endpoint_keys.append((f"active_phip_{board}", board))
             elif tab == "listed":
                 endpoint_keys.append((f"listed_{board}", board))
 
