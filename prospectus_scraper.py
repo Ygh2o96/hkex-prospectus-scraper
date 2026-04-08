@@ -655,6 +655,7 @@ def main():
 
             # Layer 1: filename prefix (instant, no HTTP)
             #   sehk*/gem* = AP/PHIP    |   YYYYMMDD* = listed-co docs
+            before = len(pdf_docs)
             if args.doc_type == "prospectus":
                 pdf_docs = [d for d in pdf_docs
                             if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
