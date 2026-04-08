@@ -34,6 +34,12 @@ except ImportError:
     import openpyxl
 
 try:
+    import xlrd
+except ImportError:
+    os.system(f"{sys.executable} -m pip install xlrd --break-system-packages -q")
+    import xlrd
+
+try:
     from playwright.sync_api import sync_playwright
 except ImportError:
     os.system(f"{sys.executable} -m pip install playwright --break-system-packages -q")
@@ -159,38 +165,70 @@ def download_nlr(year: int, force: bool = False) -> Path:
 
 def parse_nlr(filepath: Path) -> list[dict]:
     """Parse NLR Excel → [{stock_code, company, prospectus_date, listing_date}]."""
-    wb = openpyxl.load_workbook(filepath, data_only=True)
-    ws = wb.active or wb[wb.sheetnames[0]]
+
+    def to_date(val):
+        if hasattr(val, 'strftime'):
+            return val.strftime('%Y-%m-%d')
+        if isinstance(val, (int, float)):
+            # xlrd date serial number
+            try:
+                from datetime import date
+                dt = xlrd.xldate_as_datetime(val, 0)
+                return dt.strftime('%Y-%m-%d')
+            except Exception:
+                pass
+        if isinstance(val, str):
+            for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
+                try:
+                    return datetime.strptime(val.strip(), fmt).strftime('%Y-%m-%d')
+                except ValueError:
+                    continue
+        return None
+
     listings = []
-    for row in ws.iter_rows(min_row=3, values_only=True):
-        stock_code, company, prosp_date, list_date = row[1], row[2], row[3], row[4]
-        if not stock_code or not company:
-            continue
-        if str(stock_code).strip() in ('"', ''):
-            continue
-        code = str(stock_code).strip().zfill(5)
-        if not re.match(r'^\d{5}$', code):
-            continue
 
-        def to_date(val):
-            if hasattr(val, 'strftime'):
-                return val.strftime('%Y-%m-%d')
-            if isinstance(val, str):
-                for fmt in ('%d/%m/%Y', '%d/%m/%y', '%Y-%m-%d'):
-                    try:
-                        return datetime.strptime(val.strip(), fmt).strftime('%Y-%m-%d')
-                    except ValueError:
-                        continue
-            return None
+    if filepath.suffix.lower() == '.xls':
+        # Old Excel format — use xlrd
+        wb = xlrd.open_workbook(str(filepath))
+        ws = wb.sheet_by_index(0)
+        for rx in range(2, ws.nrows):  # skip header rows
+            row = [ws.cell_value(rx, c) for c in range(ws.ncols)]
+            if len(row) < 5:
+                continue
+            stock_code, company, prosp_date, list_date = row[1], row[2], row[3], row[4]
+            if not stock_code or not company:
+                continue
+            code = str(int(stock_code) if isinstance(stock_code, float) else stock_code).strip().zfill(5)
+            if not re.match(r'^\d{5}$', code):
+                continue
+            listings.append({
+                "stock_code": code,
+                "company": str(company).strip(),
+                "prospectus_date": to_date(prosp_date),
+                "listing_date": to_date(list_date),
+            })
+    else:
+        # .xlsx — use openpyxl
+        wb = openpyxl.load_workbook(filepath, data_only=True)
+        ws = wb.active or wb[wb.sheetnames[0]]
+        for row in ws.iter_rows(min_row=3, values_only=True):
+            stock_code, company, prosp_date, list_date = row[1], row[2], row[3], row[4]
+            if not stock_code or not company:
+                continue
+            if str(stock_code).strip() in ('"', ''):
+                continue
+            code = str(stock_code).strip().zfill(5)
+            if not re.match(r'^\d{5}$', code):
+                continue
+            listings.append({
+                "stock_code": code,
+                "company": str(company).strip(),
+                "prospectus_date": to_date(prosp_date),
+                "listing_date": to_date(list_date),
+            })
+        wb.close()
 
-        listings.append({
-            "stock_code": code,
-            "company": str(company).strip(),
-            "prospectus_date": to_date(prosp_date),
-            "listing_date": to_date(list_date),
-        })
-    wb.close()
-    # Deduplicate (NLR has merged cells that create duplicate rows)
+    # Deduplicate
     seen = set()
     deduped = []
     for l in listings:
