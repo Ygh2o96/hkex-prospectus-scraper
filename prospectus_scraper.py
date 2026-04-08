@@ -338,23 +338,15 @@ def download_pdf(url: str, dest: Path, state: dict) -> bool:
 # ---------------------------------------------------------------------------
 
 CRON_TAG = "# hkex-prospectus-scraper"
+LAUNCHD_LABEL = "com.hkex.prospectus-scraper"
 
 def _manage_cron(args):
-    """Install or remove a daily cron job."""
-    import subprocess, shutil
+    """Install or remove a daily scheduled job. Uses launchd on macOS, cron on Linux."""
+    import subprocess, shutil, platform
 
-    if args.remove_cron:
-        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-        if result.returncode != 0:
-            log.info("No crontab found.")
-            return
-        lines = [l for l in result.stdout.splitlines() if CRON_TAG not in l]
-        proc = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
-                              capture_output=True, text=True)
-        log.info("Cron job removed." if proc.returncode == 0 else f"Failed: {proc.stderr}")
-        return
+    is_mac = platform.system() == "Darwin"
 
-    # Build the cron command from current args
+    # Build the command from current args
     script = Path(__file__).resolve()
     python = shutil.which("python3") or shutil.which("python") or sys.executable
 
@@ -362,7 +354,7 @@ def _manage_cron(args):
     if args.latest:
         cmd_parts += ["--latest", str(args.latest)]
     else:
-        cmd_parts += ["--latest", "30"]  # default: last 30 days
+        cmd_parts += ["--latest", "30"]
 
     cmd_parts += ["--filter", args.filter]
     if args.filter == "smart":
@@ -373,36 +365,115 @@ def _manage_cron(args):
     output_dir = args.output_dir or str(DOWNLOAD_DIR)
     cmd_parts += ["--output-dir", output_dir]
 
-    cron_cmd = " ".join(cmd_parts)
-
-    # Parse cron time
     try:
         hh, mm = args.cron_time.split(":")
         cron_hour, cron_min = int(hh), int(mm)
     except Exception:
         cron_hour, cron_min = 11, 0
 
-    cron_line = f'{cron_min} {cron_hour} * * * {cron_cmd} >> {Path(output_dir).expanduser()}/cron.log 2>&1 {CRON_TAG}'
+    if args.remove_cron:
+        if is_mac:
+            _launchd_remove()
+        else:
+            _cron_remove()
+        return
 
-    # Read existing crontab
+    if is_mac:
+        _launchd_install(cmd_parts, output_dir, cron_hour, cron_min, args.cron_time)
+    else:
+        _cron_install(cmd_parts, output_dir, cron_hour, cron_min, args.cron_time)
+
+
+def _launchd_install(cmd_parts, output_dir, hour, minute, time_str):
+    """Install a macOS launchd plist — survives sleep, fires on wake if missed."""
+    import plistlib, subprocess
+
+    out_dir = Path(output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_path = out_dir / "cron.log"
+
+    plist = {
+        "Label": LAUNCHD_LABEL,
+        "ProgramArguments": cmd_parts,
+        "StartCalendarInterval": {"Hour": hour, "Minute": minute},
+        "StandardOutPath": str(log_path),
+        "StandardErrorPath": str(log_path),
+        "WorkingDirectory": str(Path(cmd_parts[1]).parent),
+        "EnvironmentVariables": {
+            "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
+        },
+    }
+
+    plist_dir = Path.home() / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True, exist_ok=True)
+    plist_path = plist_dir / f"{LAUNCHD_LABEL}.plist"
+
+    # Unload old version if exists
+    if plist_path.exists():
+        subprocess.run(["launchctl", "unload", str(plist_path)],
+                       capture_output=True)
+
+    with open(plist_path, "wb") as f:
+        plistlib.dump(plist, f)
+
+    result = subprocess.run(["launchctl", "load", str(plist_path)],
+                            capture_output=True, text=True)
+
+    if result.returncode == 0:
+        log.info(f"macOS launchd job installed (daily at {time_str}):")
+        log.info(f"  Plist  → {plist_path}")
+        log.info(f"  Output → {out_dir}")
+        log.info(f"  Logs   → {log_path}")
+        log.info(f"\n  ✓ Will fire on wake if laptop was asleep at {time_str}")
+        log.info(f"\n  Test now:  launchctl start {LAUNCHD_LABEL}")
+        log.info(f"  Remove:    python {Path(cmd_parts[1]).name} --remove-cron")
+    else:
+        log.error(f"launchctl load failed: {result.stderr}")
+
+
+def _launchd_remove():
+    import subprocess
+    plist_path = Path.home() / "Library" / "LaunchAgents" / f"{LAUNCHD_LABEL}.plist"
+    if plist_path.exists():
+        subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
+        plist_path.unlink()
+        log.info(f"launchd job removed: {plist_path}")
+    else:
+        log.info("No launchd job found.")
+
+
+def _cron_install(cmd_parts, output_dir, hour, minute, time_str):
+    """Install a Linux cron job."""
+    import subprocess
+    cron_cmd = " ".join(cmd_parts)
+    cron_line = f'{minute} {hour} * * * {cron_cmd} >> {Path(output_dir).expanduser()}/cron.log 2>&1 {CRON_TAG}'
+
     result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
     existing = result.stdout if result.returncode == 0 else ""
-
-    # Remove old entry if exists
     lines = [l for l in existing.splitlines() if CRON_TAG not in l]
     lines.append(cron_line)
 
     proc = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
                           capture_output=True, text=True)
-
     if proc.returncode == 0:
-        log.info(f"Cron job installed (daily at {args.cron_time}):")
+        log.info(f"Cron job installed (daily at {time_str}):")
         log.info(f"  {cron_line}")
-        log.info(f"\nOutputs → {output_dir}")
-        log.info(f"Logs   → {Path(output_dir).expanduser()}/cron.log")
-        log.info(f"\nTo remove: python {script.name} --remove-cron")
+        log.info(f"\n  ⚠ Cron does NOT fire if machine is asleep at {time_str}")
+        log.info(f"  Remove: python {Path(cmd_parts[1]).name} --remove-cron")
     else:
-        log.error(f"Failed to install cron: {proc.stderr}")
+        log.error(f"crontab failed: {proc.stderr}")
+
+
+def _cron_remove():
+    import subprocess
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    if result.returncode != 0:
+        log.info("No crontab found.")
+        return
+    lines = [l for l in result.stdout.splitlines() if CRON_TAG not in l]
+    subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
+                   capture_output=True, text=True)
+    log.info("Cron job removed.")
 
 
 # ---------------------------------------------------------------------------
