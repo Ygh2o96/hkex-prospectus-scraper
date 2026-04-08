@@ -835,6 +835,7 @@ def main():
             state.setdefault("searched", {})[search_key] = {
                 "docs_found": len(pdf_docs), "ts": datetime.utcnow().isoformat()
             }
+            save_state(state)  # save after every stock — crash-safe
             time.sleep(RATE_LIMIT)
 
         browser.close()
