@@ -1,8 +1,13 @@
 # HKEX Prospectus Scraper
 
-Automated scraper for **Application Proofs**, **PHIPs**, and **Prospectuses** from [HKEXnews](https://www1.hkexnews.hk/app/appindex.html).
+Two scrapers for HKEXnews IPO documents:
 
-Runs on GitHub Actions (daily schedule or manual dispatch). Downloads are stored as **GitHub Actions Artifacts** (90-day retention).
+| Workflow | Target | Source | Trigger |
+|----------|--------|--------|---------|
+| **AP Scraper** (`scraper.py`) | Application Proofs, PHIPs | [AP Index JSON API](https://www1.hkexnews.hk/app/appindex.html) | Daily cron + manual |
+| **Prospectus Scraper** (`prospectus_scraper.py`) | Prospectuses of listed companies | NLR Excel + Playwright title search | Manual dispatch |
+
+Downloads stored as **GitHub Actions Artifacts** (90-day retention).
 
 ## How It Works
 
@@ -64,6 +69,43 @@ To sync to Google Drive or Dropbox, add a step after the download step using `rc
     curl https://rclone.org/install.sh | sudo bash
     rclone copy downloads/ gdrive:HKEX_Prospectuses/ --config ${{ secrets.RCLONE_CONFIG }}
 ```
+
+## Prospectus Scraper (Listed Companies)
+
+### How It Works
+
+1. Downloads **NLR Excel files** from HKEX (yearly, stock codes + prospectus dates)
+2. Maps stock codes to HKEX internal IDs via `activestock_sehk_e.json` (18,688 entries)
+3. **Playwright mode**: Automates the HKEX title search (category: Listing Documents) per stock
+4. **Brute-force fallback**: Scans odd seq numbers 1-199 on the prospectus date, keeps files >1MB
+5. Downloads matched PDFs
+
+### Usage
+
+**GitHub Actions** → Actions → `HKEX Prospectus Scraper (Listed Companies)` → Run workflow:
+- **Years**: Space-separated NLR years (e.g. `2024 2025 2026`)
+- **Stock codes**: Optional filter (e.g. `06082 02513`)
+- **Mode**: `playwright` (precise) or `brute-force` (no browser dependency)
+
+**Local**:
+```bash
+pip install requests openpyxl playwright
+npx playwright install chromium
+
+python prospectus_scraper.py --years 2026 --dry-run
+python prospectus_scraper.py --years 2024 2025 2026
+python prospectus_scraper.py --years 2026 --stock-codes 06082 --brute-force-only
+```
+
+### URL Pattern Discovery
+
+HKEX prospectus PDFs follow: `https://www1.hkexnews.hk/listedco/listconews/sehk/{YYYY}/{MMDD}/{YYYYMMDD}{NNNNN}.pdf`
+
+Key findings from reverse-engineering:
+- Only **odd** sequence numbers exist
+- Prospectuses cluster in seq **1-50**, file size **>2MB**
+- The disclaimer popup is **client-side JS only** — PDFs are directly accessible without session/cookies
+- NLR Excel provides the exact **"Date of Prospectus"** (different from listing date)
 
 ## Config
 
