@@ -189,11 +189,12 @@ def load_stock_map() -> dict:
 # Playwright search
 # ---------------------------------------------------------------------------
 
-def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict]:
+def search_listing_docs(browser, stock_code: str, internal_id: int,
+                        date_from: str = None, date_to: str = None) -> list[dict]:
     """
     Automate HKEX Title Search: stock + category=Listing Documents.
-    Returns list of {title, url, date, headline} where headline is the
-    subcategory text (e.g. "Offer for Subscription", "Rights Issue").
+    date_from/date_to: DD/MM/YYYY format. If None, uses page defaults.
+    Returns list of {title, url, date, headline}.
     """
     page = browser.new_page()
     page.set_default_timeout(60000)
@@ -204,6 +205,33 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(4000)
+
+        # Set date range if provided (critical for stocks listed >12 months ago)
+        if date_from and date_to:
+            page.evaluate(f"""() => {{
+                // Set hidden fields that the JSF form reads
+                const fields = {{
+                    'startDate': '{date_from.replace("/","-")}',
+                    'endDate': '{date_to.replace("/","-")}',
+                }};
+                for (const [id, val] of Object.entries(fields)) {{
+                    const el = document.getElementById(id);
+                    if (el) {{ el.value = val; }}
+                }}
+                // Set the form submission fields
+                document.querySelectorAll('[name="titleSearchByAllResult.dateFromUi"]')
+                    .forEach(el => {{ el.value = '{date_from}'; }});
+                document.querySelectorAll('[name="titleSearchByAllResult.dateToUi"]')
+                    .forEach(el => {{ el.value = '{date_to}'; }});
+                // Also try to fill visible date input fields
+                document.querySelectorAll('.filter-date input[type="text"], .date-picker input, input.date-field')
+                    .forEach((el, i) => {{
+                        el.value = i === 0 ? '{date_from}' : '{date_to}';
+                        el.dispatchEvent(new Event('change', {{bubbles: true}}));
+                        el.dispatchEvent(new Event('input', {{bubbles: true}}));
+                    }});
+            }}""")
+            log.debug(f"  Date range set: {date_from} → {date_to}")
 
         # Click search
         for sel in ["a.filter__btn-apply:not(.btn-disable)",
@@ -644,7 +672,16 @@ def main():
             log.info(f"\n[{i+1}/{len(all_listings)}] {code} {company[:40]} (prosp: {prosp_date})")
 
             # Search HKEX (returns all Listing Documents for this stock)
-            docs = search_listing_docs(browser, code, internal_id)
+            # Compute date range for HKEX search (default 12mo window misses older listings)
+            search_from = None
+            search_to = None
+            if prosp_date:
+                dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
+                search_from = (dt_p - timedelta(days=args.date_margin)).strftime("%d/%m/%Y")
+                search_to = (dt_p + timedelta(days=args.date_margin + 30)).strftime("%d/%m/%Y")
+
+            docs = search_listing_docs(browser, code, internal_id,
+                                       date_from=search_from, date_to=search_to)
 
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
