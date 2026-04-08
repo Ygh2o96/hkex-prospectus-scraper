@@ -1,0 +1,98 @@
+name: HKEX Prospectus Scraper (Listed Companies)
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: 'NLR years to scrape (space-separated, e.g. "2024 2025 2026")'
+        required: true
+        default: '2026'
+        type: string
+      stock_codes:
+        description: 'Specific stock codes (space-separated, leave empty for all)'
+        required: false
+        default: ''
+        type: string
+      mode:
+        description: 'Search mode'
+        required: false
+        default: 'playwright'
+        type: choice
+        options:
+          - playwright
+          - brute-force
+      dry_run:
+        description: 'Dry run (list targets only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install requests openpyxl playwright
+          npx playwright install --with-deps chromium
+
+      - name: Restore state cache
+        uses: actions/cache@v4
+        with:
+          path: state/
+          key: hkex-prospectus-state-${{ github.ref_name }}
+          restore-keys: hkex-prospectus-state-
+
+      - name: Run prospectus scraper
+        env:
+          DOWNLOAD_DIR: downloads/prospectuses
+          STATE_FILE: state/prospectus_downloaded.json
+          RATE_LIMIT_SECONDS: '2.0'
+        run: |
+          ARGS="--years ${{ github.event.inputs.years }}"
+
+          if [ "${{ github.event.inputs.mode }}" = "brute-force" ]; then
+            ARGS="$ARGS --brute-force-only"
+          fi
+
+          if [ -n "${{ github.event.inputs.stock_codes }}" ]; then
+            ARGS="$ARGS --stock-codes ${{ github.event.inputs.stock_codes }}"
+          fi
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: python prospectus_scraper.py $ARGS"
+          python prospectus_scraper.py $ARGS
+
+      - name: Upload downloads
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hkex-prospectuses-${{ github.run_number }}
+          path: downloads/prospectuses/
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit state
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/
+          git diff --cached --quiet || git commit -m "chore: update prospectus state [$(date -u +%Y-%m-%d)]"
+          git push
