@@ -200,11 +200,14 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
     results = []
 
     try:
-        # Intercept ALL POST requests to titlesearch and inject category
+        # Intercept ALL requests to titlesearch and inject category on POST
         def handle_route(route):
             req = route.request
+            log.info(f"  [ROUTE] {req.method} {req.url[:60]}")
             if req.method == "POST" and "titlesearch" in req.url:
                 body = req.post_data or ""
+                # Log first 200 chars of POST body for debugging
+                log.info(f"  [POST body] {body[:200]}")
                 # Inject tierOneId=30000 (Listing Documents)
                 if "tierOneId=" in body:
                     body = re.sub(r'tierOneId=[^&]*', f'tierOneId={LISTING_DOCS_CATEGORY}', body)
@@ -215,12 +218,12 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
                     body = re.sub(r'searchTypeInt=[^&]*', 'searchTypeInt=1', body)
                 else:
                     body += "&searchTypeInt=1"
-                log.debug(f"  Intercepted POST → injected tierOneId={LISTING_DOCS_CATEGORY}")
+                log.info(f"  [INJECTED] tierOneId={LISTING_DOCS_CATEGORY}")
                 route.continue_(post_data=body)
             else:
                 route.continue_()
 
-        page.route("**/*titlesearch*", handle_route)
+        page.route("**/*", handle_route)  # catch ALL requests
 
         url = (f"{TITLESEARCH_URL}?lang=EN&market=SEHK"
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
