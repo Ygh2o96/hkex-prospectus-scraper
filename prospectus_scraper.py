@@ -649,26 +649,34 @@ def main():
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # ── HEADLINE-BASED DOC TYPE FILTER (the real fix) ──
-            # HKEX labels each result: "Offer for Subscription", "Rights Issue", etc.
-            # Map --doc-type to headline keywords
-            PROSPECTUS_HEADLINES = {"offer for subscription", "offer for sale",
-                                    "placing of securities of a class new to listing"}
+            # ── DOC TYPE FILTER ──
+            # Each result has: headline (subcategory), title (link text)
+            # headline: "Offer for Subscription" (may be empty if DOM parse fails)
+            # title: "Global Offering (22MB)" or "GLOBAL OFFERING" etc.
+            PROSPECTUS_KEYWORDS_HL = {"offer for subscription", "offer for sale",
+                                      "placing of securities of a class new to listing"}
+            PROSPECTUS_KEYWORDS_TITLE = {"global offering", "prospectus", "招股",
+                                         "全球發售", "全球发售"}
 
             before = len(pdf_docs)
             if args.doc_type == "prospectus":
-                # Filter by headline text (primary) + filename fallback
                 filtered = []
                 for d in pdf_docs:
-                    hl = d.get("headline", "").lower()
-                    fname = d["url"].split("/")[-1].lower()
-                    # Match by headline if available
-                    if hl and hl in PROSPECTUS_HEADLINES:
+                    hl = d.get("headline", "").lower().strip()
+                    title = d.get("title", "").lower().strip()
+                    # Match by headline subcategory
+                    if hl and hl in PROSPECTUS_KEYWORDS_HL:
                         filtered.append(d)
-                    # If no headline extracted, use filename heuristic
-                    elif not hl and not fname.startswith(("sehk", "gem")):
+                        continue
+                    # Match by link title text
+                    if any(kw in title for kw in PROSPECTUS_KEYWORDS_TITLE):
                         filtered.append(d)
+                        continue
                 pdf_docs = filtered
+                if not filtered and before > 0:
+                    log.warning(f"  ⚠ No prospectus matched by headline/title. "
+                                f"Headlines: {set(d.get('headline','') for d in docs)}")
+                    log.warning(f"    Titles: {[d.get('title','')[:40] for d in docs[:5]]}")
             elif args.doc_type == "all-listed":
                 pdf_docs = [d for d in pdf_docs
                             if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
