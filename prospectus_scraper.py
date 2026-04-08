@@ -191,76 +191,49 @@ def load_stock_map() -> dict:
 
 def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict]:
     """
-    Automate HKEX Title Search: stock + category=Listing Documents.
-    Uses actual UI interaction to ensure category is selected.
-    Returns list of {title, url, date, headline}.
+    Plan B: intercept the JSF form POST and inject tierOneId=30000.
+    The JSF form ignores all DOM manipulation — the only way to filter
+    by "Listing Documents" is to modify the POST body in flight.
     """
     page = browser.new_page()
     page.set_default_timeout(60000)
     results = []
 
     try:
+        # Intercept ALL POST requests to titlesearch and inject category
+        def handle_route(route):
+            req = route.request
+            if req.method == "POST" and "titlesearch" in req.url:
+                body = req.post_data or ""
+                # Inject tierOneId=30000 (Listing Documents)
+                if "tierOneId=" in body:
+                    body = re.sub(r'tierOneId=[^&]*', f'tierOneId={LISTING_DOCS_CATEGORY}', body)
+                else:
+                    body += f"&tierOneId={LISTING_DOCS_CATEGORY}"
+                # Ensure searchTypeInt=1 (Headline Category mode, not ALL)
+                if "searchTypeInt=" in body:
+                    body = re.sub(r'searchTypeInt=[^&]*', 'searchTypeInt=1', body)
+                else:
+                    body += "&searchTypeInt=1"
+                log.debug(f"  Intercepted POST → injected tierOneId={LISTING_DOCS_CATEGORY}")
+                route.continue_(post_data=body)
+            else:
+                route.continue_()
+
+        page.route("**/*titlesearch*", handle_route)
+
         url = (f"{TITLESEARCH_URL}?lang=EN&market=SEHK"
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(4000)
 
-        # Verify the Headline Category dropdown shows "Listing Documents"
-        # If URL param didn't stick, click the dropdown and select it
-        tier1_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
-        if tier1_val != LISTING_DOCS_CATEGORY:
-            log.info(f"  Category={tier1_val}, fixing...")
-            try:
-                # Step 1: Switch search type to "Headline Category" (enables the filter)
-                search_type_dd = page.query_selector('.searchType .combobox-field')
-                if search_type_dd:
-                    search_type_dd.click()
-                    page.wait_for_timeout(500)
-                    st_items = page.query_selector_all('.droplist-item')
-                    for item in st_items:
-                        txt = item.inner_text().strip().lower()
-                        if item.is_visible() and ("headline" in txt or "category" in txt):
-                            item.click()
-                            log.info(f"  ✓ Search type → '{item.inner_text().strip()[:40]}'")
-                            page.wait_for_timeout(1500)
-                            break
-
-                # Step 2: Force-set the hidden field + trigger HKEX's JS handler
-                page.evaluate(f"""() => {{
-                    // Set the hidden field directly
-                    const t1 = document.getElementById('tierOneId');
-                    if (t1) t1.value = '{LISTING_DOCS_CATEGORY}';
-                    const t2 = document.getElementById('tierTwoId');
-                    if (t2) t2.value = '-2';
-                    // Update the visible dropdown text
-                    const fields = document.querySelectorAll('.tier1-wrap .combobox-field, .searchType-Categroy .combobox-field');
-                    fields.forEach(f => {{
-                        if (f.getAttribute('data-value') === '-2' || f.getAttribute('value') === '-2') {{
-                            f.setAttribute('data-value', '{LISTING_DOCS_CATEGORY}');
-                            f.setAttribute('value', '{LISTING_DOCS_CATEGORY}');
-                            f.textContent = 'Listing Documents';
-                        }}
-                    }});
-                    // Trigger jQuery change event that HKEX JS listens on
-                    if (typeof jQuery !== 'undefined') {{
-                        jQuery('.tier1-wrap .combobox-field').trigger('change');
-                    }}
-                }}""")
-                page.wait_for_timeout(500)
-
-                # Verify
-                new_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
-                log.info(f"  tierOneId after fix: {new_val}")
-
-            except Exception as e:
-                log.warning(f"  Category fix error: {e}")
-
-        # Click SEARCH button (actual class: filter__btn-applyFilters-js)
+        # Click SEARCH — the POST will be intercepted and modified
         for sel in ["a.filter__btn-applyFilters-js",
                     "a.filter__btn-apply:not(.btn-disable)",
                     "a[class*='btn-apply']"]:
             btn = page.query_selector(sel)
             if btn and btn.is_visible():
+                log.info(f"  Searching (POST interception active)...")
                 btn.click()
                 break
 
@@ -274,39 +247,31 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
             pass
         page.wait_for_timeout(2000)
 
-        # Extract PDFs with headline text
+        # Extract PDFs
         results = page.evaluate("""() => {
             const links = [];
             const panel = document.getElementById('titleSearchResultPanel');
             if (!panel) return links;
-
             panel.querySelectorAll('a[href*=".pdf"]').forEach(a => {
                 let href = a.getAttribute('href') || '';
                 if (href.startsWith('/')) href = 'https://www1.hkexnews.hk' + href;
-
                 let container = a.closest('tr') || a.closest('.row') || a.parentElement?.parentElement;
-                const containerText = container ? container.innerText : '';
-
-                const hlMatch = containerText.match(/Listing Documents\\s*-\\s*\\[([^\\]]+)\\]/i);
-                const headline = hlMatch ? hlMatch[1].trim() : '';
-
-                const dtMatch = containerText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
-                const date = dtMatch ? dtMatch[1] : '';
-
+                const text = container ? container.innerText : '';
+                const hlMatch = text.match(/Listing Documents\\s*-\\s*\\[([^\\]]+)\\]/i);
+                const dtMatch = text.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
                 links.push({
                     url: href,
                     title: a.innerText.trim().substring(0, 120),
-                    date: date,
-                    headline: headline
+                    date: dtMatch ? dtMatch[1] : '',
+                    headline: hlMatch ? hlMatch[1].trim() : ''
                 });
             });
             return links;
         }""")
 
-        # Diagnostic: log first few titles
         if results:
             sample = [r.get("title","")[:40] for r in results[:3]]
-            log.info(f"  {stock_code}: {len(results)} result(s) — sample: {sample}")
+            log.info(f"  {stock_code}: {len(results)} result(s) — {sample}")
         else:
             log.info(f"  {stock_code}: 0 results")
 
