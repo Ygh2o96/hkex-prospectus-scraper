@@ -189,123 +189,75 @@ def load_stock_map() -> dict:
 # Playwright search
 # ---------------------------------------------------------------------------
 
-def search_listing_docs(browser, stock_code: str, internal_id: int,
-                        date_from: str, date_to: str,
-                        tier2_code: str = "-2") -> list[dict]:
+def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict]:
     """
-    Automate HKEX Title Search page with Playwright.
-    tier2_code: -2=all listing docs, 30700=prospectus only, etc.
-    Returns list of {title, url, date} for PDF results.
+    Automate HKEX Title Search: stock + category=Listing Documents.
+    Returns list of {title, url, date, headline} where headline is the
+    subcategory text (e.g. "Offer for Subscription", "Rights Issue").
     """
     page = browser.new_page()
     page.set_default_timeout(60000)
     results = []
 
     try:
-        # Navigate with pre-filled stock + headline category
         url = (f"{TITLESEARCH_URL}?lang=EN&market=SEHK"
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
-
-        # Wait for JS framework to initialize
         page.wait_for_timeout(4000)
 
-        # Set date range + subcategory via JS hidden fields
-        df = datetime.strptime(date_from, "%Y%m%d")
-        dt = datetime.strptime(date_to, "%Y%m%d")
-        page.evaluate(f"""() => {{
-            const sd = document.getElementById('startDate');
-            const ed = document.getElementById('endDate');
-            if (sd) sd.value = '{df.strftime("%Y-%m-%d")}';
-            if (ed) ed.value = '{dt.strftime("%Y-%m-%d")}';
-            const fromUi = document.querySelector('[name="titleSearchByAllResult.dateFromUi"]');
-            const toUi = document.querySelector('[name="titleSearchByAllResult.dateToUi"]');
-            if (fromUi) fromUi.value = '{df.strftime("%d/%m/%Y")}';
-            if (toUi) toUi.value = '{dt.strftime("%d/%m/%Y")}';
-            // Set headline subcategory for server-side filtering
-            const t1 = document.getElementById('tierOneId');
-            const t2 = document.getElementById('tierTwoId');
-            if (t1) t1.value = '{LISTING_DOCS_CATEGORY}';
-            if (t2) t2.value = '{tier2_code}';
-        }}""")
-
-        # Find and click the search/apply button
-        btn_selectors = [
-            "a.filter__btn-apply:not(.btn-disable)",
-            ".filter__btn-apply:not(.btn-disable)",
-            "a[class*='btn-apply']",
-        ]
-        for sel in btn_selectors:
+        # Click search
+        for sel in ["a.filter__btn-apply:not(.btn-disable)",
+                    ".filter__btn-apply:not(.btn-disable)",
+                    "a[class*='btn-apply']"]:
             btn = page.query_selector(sel)
             if btn and btn.is_visible():
                 btn.click()
-                log.debug(f"  Clicked: {sel}")
                 break
 
-        # Wait for search results
         try:
             page.wait_for_selector(
                 "#titleSearchResultPanel .news_headline,"
                 "#titleSearchResultPanel a[href*='.pdf'],"
-                ".no-match-text",
-                timeout=20000)
+                ".no-match-text", timeout=20000)
         except Exception:
             pass
         page.wait_for_timeout(2000)
 
-        # Extract PDF links — try multiple selector strategies
+        # Extract PDFs with headline subcategory text
         results = page.evaluate("""() => {
             const links = [];
-            // Strategy 1: direct PDF links in result panel
-            document.querySelectorAll('#titleSearchResultPanel a[href]').forEach(a => {
-                const href = a.getAttribute('href') || '';
-                if (href.includes('.pdf')) {
-                    const row = a.closest('tr');
-                    const cells = row ? row.querySelectorAll('td') : [];
-                    const date = cells.length > 0 ? cells[0].innerText.trim() : '';
-                    links.push({
-                        url: href.startsWith('/') ? 'https://www1.hkexnews.hk' + href : href,
-                        title: a.innerText.trim().substring(0, 120),
-                        date: date.substring(0, 10)
-                    });
-                }
-            });
-            // Strategy 2: any PDF link on page outside nav
-            if (links.length === 0) {
-                document.querySelectorAll('.search-results a[href*=".pdf"], .result-table a[href*=".pdf"]').forEach(a => {
-                    links.push({
-                        url: a.href,
-                        title: a.innerText.trim().substring(0, 120),
-                        date: ''
-                    });
+            // Each result row has: date, stock info, headline category, document link
+            const panel = document.getElementById('titleSearchResultPanel');
+            if (!panel) return links;
+
+            // Get all PDF links
+            panel.querySelectorAll('a[href*=".pdf"]').forEach(a => {
+                let href = a.getAttribute('href') || '';
+                if (href.startsWith('/')) href = 'https://www1.hkexnews.hk' + href;
+
+                // Walk up to find the result container (row/div)
+                let container = a.closest('tr') || a.closest('.row') || a.parentElement?.parentElement;
+                const containerText = container ? container.innerText : '';
+
+                // Extract headline: "Listing Documents - [Offer for Subscription]"
+                const hlMatch = containerText.match(/Listing Documents\\s*-\\s*\\[([^\\]]+)\\]/i);
+                const headline = hlMatch ? hlMatch[1].trim() : '';
+
+                // Extract date: DD/MM/YYYY
+                const dtMatch = containerText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
+                const date = dtMatch ? dtMatch[1] : '';
+
+                links.push({
+                    url: href,
+                    title: a.innerText.trim().substring(0, 120),
+                    date: date,
+                    headline: headline
                 });
-            }
+            });
             return links;
         }""")
 
-        # Check for "load more" and click if present
-        loadmore = page.query_selector(".component-loadmore a:not(.btn-disable)")
-        if loadmore and loadmore.is_visible() and len(results) >= 20:
-            loadmore.click()
-            page.wait_for_timeout(3000)
-            extra = page.evaluate("""() => {
-                const links = [];
-                document.querySelectorAll('#titleSearchResultPanel a[href*=".pdf"]').forEach(a => {
-                    links.push({
-                        url: a.href.startsWith('/') ? 'https://www1.hkexnews.hk' + a.href : a.href,
-                        title: a.innerText.trim().substring(0, 120),
-                        date: ''
-                    });
-                });
-                return links;
-            }""")
-            # Merge, dedup
-            seen_urls = {r["url"] for r in results}
-            for e in extra:
-                if e["url"] not in seen_urls:
-                    results.append(e)
-
-        log.info(f"  {stock_code}: {len(results)} listing document(s) found")
+        log.info(f"  {stock_code}: {len(results)} result(s) from HKEX")
 
     except Exception as e:
         log.error(f"  {stock_code}: search failed — {e}")
@@ -577,7 +529,12 @@ def main():
     # ---- Override output dir ----
     global DOWNLOAD_DIR
     if args.output_dir:
-        DOWNLOAD_DIR = Path(args.output_dir).expanduser().resolve()
+        base = Path(args.output_dir).expanduser().resolve()
+        # Auto-append 'prospectuses' if not already in the path
+        if base.name != "prospectuses":
+            DOWNLOAD_DIR = base / "prospectuses"
+        else:
+            DOWNLOAD_DIR = base
 
     if args.dry_run:
         global DRY_RUN
@@ -686,41 +643,44 @@ def main():
 
             log.info(f"\n[{i+1}/{len(all_listings)}] {code} {company[:40]} (prosp: {prosp_date})")
 
-            # Date range
-            if prosp_date:
-                dt = datetime.strptime(prosp_date, "%Y-%m-%d")
-                date_from = (dt - timedelta(days=args.date_margin)).strftime("%Y%m%d")
-                date_to = (dt + timedelta(days=args.date_margin)).strftime("%Y%m%d")
-            else:
-                date_to = datetime.now().strftime("%Y%m%d")
-                date_from = (datetime.now() - timedelta(days=90)).strftime("%Y%m%d")
-
-            # ── Determine tier2 code for server-side filtering ──
-            # prospectus  → tier2=30700 (HKEX returns ONLY the Global Offering doc)
-            # all-listed  → tier2=-2    (all Listing Documents subcategories)
-            # ap-phip     → tier2=-2    (get everything, filter by filename after)
-            # everything  → tier2=-2
-            tier2 = TIER2_CODES.get("prospectus") if args.doc_type == "prospectus" \
-                    else TIER2_CODES["all"]
-
-            # Search HKEX
-            docs = search_listing_docs(browser, code, internal_id,
-                                       date_from, date_to, tier2_code=tier2)
+            # Search HKEX (returns all Listing Documents for this stock)
+            docs = search_listing_docs(browser, code, internal_id)
 
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # ── Filename-based filter (only needed for ap-phip / everything) ──
-            # sehk*/gem* = AP system docs | YYYYMMDD* = listed-co docs
-            if args.doc_type == "ap-phip":
-                pdf_docs = [d for d in pdf_docs
-                            if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
-            elif args.doc_type in ("prospectus", "all-listed"):
-                # Drop any AP-system docs that leaked through
+            # ── HEADLINE-BASED DOC TYPE FILTER (the real fix) ──
+            # HKEX labels each result: "Offer for Subscription", "Rights Issue", etc.
+            # Map --doc-type to headline keywords
+            PROSPECTUS_HEADLINES = {"offer for subscription", "offer for sale",
+                                    "placing of securities of a class new to listing"}
+
+            before = len(pdf_docs)
+            if args.doc_type == "prospectus":
+                # Filter by headline text (primary) + filename fallback
+                filtered = []
+                for d in pdf_docs:
+                    hl = d.get("headline", "").lower()
+                    fname = d["url"].split("/")[-1].lower()
+                    # Match by headline if available
+                    if hl and hl in PROSPECTUS_HEADLINES:
+                        filtered.append(d)
+                    # If no headline extracted, use filename heuristic
+                    elif not hl and not fname.startswith(("sehk", "gem")):
+                        filtered.append(d)
+                pdf_docs = filtered
+            elif args.doc_type == "all-listed":
                 pdf_docs = [d for d in pdf_docs
                             if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            elif args.doc_type == "ap-phip":
+                pdf_docs = [d for d in pdf_docs
+                            if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            # "everything" = no filter
 
-            # ── Size filter (only when needed) ──
+            if before != len(pdf_docs):
+                log.info(f"  Filtered: {before} → {len(pdf_docs)} ({args.doc_type})")
+
+            # ── Size filter (only when explicitly needed) ──
             if args.filter in ("smart", "top-n") and pdf_docs:
                 log.info(f"  Checking sizes for {len(pdf_docs)} files...")
                 for doc in pdf_docs:
@@ -730,12 +690,9 @@ def main():
                     except Exception:
                         doc["size"] = 0
                     time.sleep(0.15)
-
                 if args.filter == "smart":
                     min_bytes = int(args.min_size_mb * 1024 * 1024)
-                    before = len(pdf_docs)
                     pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
-                    log.info(f"  Smart filter (≥{args.min_size_mb}MB): {before} → {len(pdf_docs)}")
                 elif args.filter == "top-n":
                     pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
                     pdf_docs = pdf_docs[:args.top_n]
