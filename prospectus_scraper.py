@@ -200,30 +200,22 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
     results = []
 
     try:
-        # Intercept ALL requests to titlesearch and inject category on POST
+        # Intercept form POST and inject correct category
         def handle_route(route):
             req = route.request
-            log.info(f"  [ROUTE] {req.method} {req.url[:60]}")
             if req.method == "POST" and "titlesearch" in req.url:
                 body = req.post_data or ""
-                # Log first 200 chars of POST body for debugging
-                log.info(f"  [POST body] {body[:200]}")
-                # Inject tierOneId=30000 (Listing Documents)
-                if "tierOneId=" in body:
-                    body = re.sub(r'tierOneId=[^&]*', f'tierOneId={LISTING_DOCS_CATEGORY}', body)
-                else:
-                    body += f"&tierOneId={LISTING_DOCS_CATEGORY}"
-                # Ensure searchTypeInt=1 (Headline Category mode, not ALL)
-                if "searchTypeInt=" in body:
-                    body = re.sub(r'searchTypeInt=[^&]*', 'searchTypeInt=1', body)
-                else:
-                    body += "&searchTypeInt=1"
-                log.info(f"  [INJECTED] tierOneId={LISTING_DOCS_CATEGORY}")
+                # The actual field names (from POST body diagnostic):
+                #   t1code=-2  → t1code=30000 (Listing Documents)
+                #   searchType=0 → searchType=1 (Headline Category mode)
+                body = re.sub(r't1code=[^&]*', f't1code={LISTING_DOCS_CATEGORY}', body)
+                body = re.sub(r'searchType=0', 'searchType=1', body)
+                log.info(f"  [POST] t1code={LISTING_DOCS_CATEGORY}, searchType=1")
                 route.continue_(post_data=body)
             else:
                 route.continue_()
 
-        page.route("**/*", handle_route)  # catch ALL requests
+        page.route("**/*", handle_route)
 
         url = (f"{TITLESEARCH_URL}?lang=EN&market=SEHK"
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
