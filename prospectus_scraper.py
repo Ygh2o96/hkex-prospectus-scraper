@@ -91,11 +91,11 @@ def get_nlr_url(year: int) -> str:
     else:
         return f"{NLR_BASE}/{year}.xls"
 
-def download_nlr(year: int) -> Path:
+def download_nlr(year: int, force: bool = False) -> Path:
     url = get_nlr_url(year)
     ext = ".xlsx" if url.endswith(".xlsx") else ".xls"
     local = Path(f"/tmp/NLR{year}{ext}")
-    if local.exists():
+    if local.exists() and not force:
         return local
     log.info(f"Downloading NLR {year}: {url}")
     resp = SESSION.get(url, timeout=30)
@@ -333,15 +333,118 @@ def download_pdf(url: str, dest: Path, state: dict) -> bool:
 # Main
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Cron management
+# ---------------------------------------------------------------------------
+
+CRON_TAG = "# hkex-prospectus-scraper"
+
+def _manage_cron(args):
+    """Install or remove a daily cron job."""
+    import subprocess, shutil
+
+    if args.remove_cron:
+        result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        if result.returncode != 0:
+            log.info("No crontab found.")
+            return
+        lines = [l for l in result.stdout.splitlines() if CRON_TAG not in l]
+        proc = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
+                              capture_output=True, text=True)
+        log.info("Cron job removed." if proc.returncode == 0 else f"Failed: {proc.stderr}")
+        return
+
+    # Build the cron command from current args
+    script = Path(__file__).resolve()
+    python = shutil.which("python3") or shutil.which("python") or sys.executable
+
+    cmd_parts = [python, str(script)]
+    if args.latest:
+        cmd_parts += ["--latest", str(args.latest)]
+    else:
+        cmd_parts += ["--latest", "30"]  # default: last 30 days
+
+    cmd_parts += ["--filter", args.filter]
+    if args.filter == "smart":
+        cmd_parts += ["--min-size-mb", str(args.min_size_mb)]
+    elif args.filter == "top-n":
+        cmd_parts += ["--top-n", str(args.top_n)]
+
+    output_dir = args.output_dir or str(DOWNLOAD_DIR)
+    cmd_parts += ["--output-dir", output_dir]
+
+    cron_cmd = " ".join(cmd_parts)
+
+    # Daily at 18:00 (after HK market close)
+    cron_line = f'0 18 * * * {cron_cmd} >> {Path(output_dir).expanduser()}/cron.log 2>&1 {CRON_TAG}'
+
+    # Read existing crontab
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    existing = result.stdout if result.returncode == 0 else ""
+
+    # Remove old entry if exists
+    lines = [l for l in existing.splitlines() if CRON_TAG not in l]
+    lines.append(cron_line)
+
+    proc = subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
+                          capture_output=True, text=True)
+
+    if proc.returncode == 0:
+        log.info(f"Cron job installed (daily at 18:00):")
+        log.info(f"  {cron_line}")
+        log.info(f"\nOutputs → {output_dir}")
+        log.info(f"Logs   → {Path(output_dir).expanduser()}/cron.log")
+        log.info(f"\nTo remove: python {script.name} --remove-cron")
+    else:
+        log.error(f"Failed to install cron: {proc.stderr}")
+
+
+# ---------------------------------------------------------------------------
+# Date parsing
+# ---------------------------------------------------------------------------
+
+def parse_flexible_date(s: str) -> datetime:
+    """Parse dates in various formats: 01Jan2024, 01/01/2024, 2024-01-01, 01-Jan-2024."""
+    s = s.strip()
+    for fmt in ("%d%b%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%b-%Y", "%d%B%Y", "%Y%m%d"):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Cannot parse date: '{s}'. Use formats like 01Jan2024, 01/01/2024, 2024-01-01")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="HKEX Prospectus Scraper (Playwright)")
-    parser.add_argument("--years", nargs="+", type=int, required=True,
-                        help="Year(s) to scrape, e.g. --years 2024 2025 2026")
+    parser = argparse.ArgumentParser(
+        description="HKEX Prospectus Scraper (Playwright)",
+        epilog="""Examples:
+  # Top-3 for all of 2026
+  %(prog)s --years 2026 --filter top-n
+
+  # Date range
+  %(prog)s --date-range 01Jan2025-31Mar2026 --filter smart
+
+  # Latest 30 days (for cron)
+  %(prog)s --latest 30 --filter top-n --top-n 3
+
+  # Install daily cron job
+  %(prog)s --install-cron --latest 30 --filter top-n --output-dir ~/HKEX_Prospectuses
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    # Source selection (at least one required)
+    src = parser.add_argument_group("Source selection (pick one or combine)")
+    src.add_argument("--years", nargs="+", type=int, default=None,
+                     help="Year(s) to scrape, e.g. --years 2024 2025 2026")
+    src.add_argument("--date-range", type=str, default=None,
+                     help="Listing date range, e.g. 01Jan2025-31Dec2025 or 01/01/2025-31/12/2025")
+    src.add_argument("--latest", type=int, default=None,
+                     help="Only process listings from the last N days (ideal for cron)")
     parser.add_argument("--stock", type=str, default=None,
                         help="Single stock code to scrape (testing)")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--date-margin", type=int, default=7,
-                        help="Days around prospectus date to search (default: 7)")
+                        help="Days around prospectus date to search HKEX (default: 7)")
     parser.add_argument("--filter", type=str, default="smart",
                         choices=["all", "smart", "top-n"],
                         help="Download filter: all=everything, smart=skip sub-MB files, "
@@ -350,19 +453,72 @@ def main():
                         help="Min file size in MB for 'smart' filter (default: 1.0)")
     parser.add_argument("--top-n", type=int, default=3,
                         help="Number of largest files to keep for 'top-n' filter (default: 3)")
+    parser.add_argument("--output-dir", type=str, default=None,
+                        help="Override download directory (default: downloads/prospectuses)")
+
+    # Cron management
+    parser.add_argument("--install-cron", action="store_true",
+                        help="Install a daily cron job and exit. Combines with other flags to set the cron command.")
+    parser.add_argument("--remove-cron", action="store_true",
+                        help="Remove the installed cron job and exit")
     args = parser.parse_args()
+
+    # ---- Cron management ----
+    if args.install_cron or args.remove_cron:
+        _manage_cron(args)
+        return
+
+    # ---- Override output dir ----
+    global DOWNLOAD_DIR
+    if args.output_dir:
+        DOWNLOAD_DIR = Path(args.output_dir).expanduser().resolve()
 
     if args.dry_run:
         global DRY_RUN
         DRY_RUN = True
 
+    # ---- Determine which NLR years to fetch ----
+    date_filter_from = None
+    date_filter_to = None
+
+    if args.date_range:
+        parts = args.date_range.split("-", 1)
+        if len(parts) != 2:
+            # Try other separators
+            for sep in (" to ", "~", ".."):
+                if sep in args.date_range:
+                    parts = args.date_range.split(sep, 1)
+                    break
+        if len(parts) != 2:
+            log.error("Invalid --date-range format. Use: 01Jan2025-31Dec2025")
+            return
+        date_filter_from = parse_flexible_date(parts[0])
+        date_filter_to = parse_flexible_date(parts[1])
+        log.info(f"Date range filter: {date_filter_from.strftime('%Y-%m-%d')} → {date_filter_to.strftime('%Y-%m-%d')}")
+
+    if args.latest:
+        date_filter_to = datetime.now()
+        date_filter_from = date_filter_to - timedelta(days=args.latest)
+        log.info(f"Latest {args.latest} days: {date_filter_from.strftime('%Y-%m-%d')} → {date_filter_to.strftime('%Y-%m-%d')}")
+
+    # Determine years to fetch NLR files for
+    if args.years:
+        years = args.years
+    elif date_filter_from and date_filter_to:
+        years = list(range(date_filter_from.year, date_filter_to.year + 1))
+    else:
+        # Default: current year
+        years = [datetime.now().year]
+        log.info(f"No --years/--date-range/--latest specified, defaulting to {years[0]}")
+
     state = load_state()
 
     # 1. Parse NLR files
     all_listings = []
-    for year in args.years:
+    force_fresh = args.latest is not None  # always re-download NLR in cron mode
+    for year in years:
         try:
-            nlr_path = download_nlr(year)
+            nlr_path = download_nlr(year, force=force_fresh)
             all_listings.extend(parse_nlr(nlr_path))
         except Exception as e:
             log.error(f"NLR {year} failed: {e}")
@@ -370,6 +526,23 @@ def main():
     if not all_listings:
         log.error("No listings found.")
         return
+
+    # Apply date range filter on listing_date
+    if date_filter_from and date_filter_to:
+        before = len(all_listings)
+        filtered = []
+        for l in all_listings:
+            ld = l.get("listing_date")
+            if not ld:
+                continue
+            try:
+                ld_dt = datetime.strptime(ld, "%Y-%m-%d")
+                if date_filter_from <= ld_dt <= date_filter_to:
+                    filtered.append(l)
+            except ValueError:
+                continue
+        all_listings = filtered
+        log.info(f"Date filter: {before} → {len(all_listings)} listings")
 
     if args.stock:
         code = args.stock.zfill(5)
