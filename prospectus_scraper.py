@@ -232,8 +232,29 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
                             page.wait_for_timeout(1000)
                             break
 
-                # Step 2: Now the headline category dropdown should be enabled
-                tier1_trigger = page.query_selector('.tier1-wrap .combobox-field')
+                # Step 2: Wait for headline category dropdown to become enabled/visible
+                page.wait_for_timeout(2000)  # give page time to re-render
+
+                # Try multiple selectors — page may restructure after search type change
+                tier1_trigger = None
+                for sel in ['.tier1-wrap .combobox-field',
+                            '.searchType-Categroy .combobox-field',
+                            '.tier1-wrap a.combobox-field']:
+                    try:
+                        tier1_trigger = page.wait_for_selector(sel, state="visible", timeout=5000)
+                        if tier1_trigger:
+                            break
+                    except Exception:
+                        continue
+
+                if not tier1_trigger:
+                    # Last resort: find any combobox-field that shows "All" and isn't disabled
+                    all_fields = page.query_selector_all('a.combobox-field')
+                    for f in all_fields:
+                        if f.is_visible() and f.get_attribute('data-value') == '-1':
+                            tier1_trigger = f
+                            break
+
                 if tier1_trigger:
                     tier1_trigger.click()
                     page.wait_for_timeout(800)
