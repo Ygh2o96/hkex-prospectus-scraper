@@ -649,94 +649,72 @@ def main():
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # ── DOC TYPE FILTER (fast, no HTTP needed) ──
-            # Filename patterns:
-            #   sehk*.pdf / gem*.pdf  → AP system (Application Proof, PHIP)
-            #   YYYYMMDD*.pdf         → Listed company doc (prospectus, allotment, etc.)
-            # Key insight: prospectus filename starts with its publication date (from NLR)
+            # ══════════════════════════════════════════════════════
+            # FILTER PIPELINE (fast layers first, HTTP only when needed)
+            # ══════════════════════════════════════════════════════
 
-            before = len(pdf_docs)
+            # Layer 1: filename prefix (instant, no HTTP)
+            #   sehk*/gem* = AP/PHIP    |   YYYYMMDD* = listed-co docs
             if args.doc_type == "prospectus":
-                if prosp_date:
-                    date_prefix = prosp_date.replace("-", "")  # "2023-12-27" → "20231227"
-
-                    # Try 1: match from Playwright results
-                    matched = [d for d in pdf_docs
-                               if d["url"].split("/")[-1].startswith(date_prefix)]
-
-                    # Try 2: if Playwright didn't return the right docs,
-                    # scan the date's PDFs directly (bypasses broken JSF search)
-                    if not matched:
-                        dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
-                        yyyy = dt_p.strftime("%Y")
-                        mmdd = dt_p.strftime("%m%d")
-                        scan_base = f"{BASE_URL}/listedco/listconews/sehk/{yyyy}/{mmdd}/{date_prefix}"
-                        log.info(f"  Direct scan: {date_prefix}*.pdf (odd seq 1-99)...")
-                        candidates = []
-                        for seq in range(1, 100, 2):
-                            url = f"{scan_base}{seq:05d}.pdf"
-                            try:
-                                resp = SESSION.head(url, timeout=8, allow_redirects=True)
-                                if resp.status_code == 200:
-                                    size = int(resp.headers.get("Content-Length", 0))
-                                    candidates.append({"url": url, "size": size})
-                            except Exception:
-                                pass
-                            time.sleep(0.05)
-                        if candidates:
-                            candidates.sort(key=lambda c: c["size"], reverse=True)
-                            matched = [candidates[0]]  # largest = prospectus
-                            log.info(f"  Found {len(candidates)} PDFs, "
-                                     f"largest: {matched[0]['url'].split('/')[-1]} "
-                                     f"({matched[0]['size']/1024/1024:.1f}MB)")
-                        else:
-                            log.warning(f"  No PDFs found on {prosp_date}")
-
-                    # If multiple Playwright matches on same date, keep largest
-                    elif len(matched) > 1:
-                        for doc in matched:
-                            if "size" not in doc:
-                                try:
-                                    resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
-                                    doc["size"] = int(resp.headers.get("Content-Length", 0))
-                                except Exception:
-                                    doc["size"] = 0
-                        matched.sort(key=lambda d: d.get("size", 0), reverse=True)
-                        matched = matched[:1]
-
-                    pdf_docs = matched
-                    log.info(f"  Prospectus: {before} → {len(pdf_docs)}")
-                else:
-                    log.warning(f"  No prospectus date in NLR — skipping")
-                    pdf_docs = []
-
-            elif args.doc_type == "all-listed":
                 pdf_docs = [d for d in pdf_docs
                             if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+                log.info(f"  After drop AP/PHIP: {before} → {len(pdf_docs)}")
             elif args.doc_type == "ap-phip":
                 pdf_docs = [d for d in pdf_docs
                             if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
-            # "everything" = no filter
+            elif args.doc_type == "all-listed":
+                pdf_docs = [d for d in pdf_docs
+                            if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            # "everything" = no filename filter
 
-            if before != len(pdf_docs):
-                log.info(f"  Filtered: {before} → {len(pdf_docs)} ({args.doc_type})")
-
-            # ── Size filter (only when explicitly needed) ──
-            if args.filter in ("smart", "top-n") and pdf_docs:
+            # Layer 2: size filter (HEAD only on survivors from Layer 1)
+            if pdf_docs and args.filter in ("smart", "top-n"):
                 log.info(f"  Checking sizes for {len(pdf_docs)} files...")
                 for doc in pdf_docs:
                     try:
-                        resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
+                        resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
                         doc["size"] = int(resp.headers.get("Content-Length", 0))
                     except Exception:
                         doc["size"] = 0
-                    time.sleep(0.15)
+                    time.sleep(0.1)
+
                 if args.filter == "smart":
                     min_bytes = int(args.min_size_mb * 1024 * 1024)
                     pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
+                    log.info(f"  After ≥{args.min_size_mb}MB filter: {len(pdf_docs)} files")
                 elif args.filter == "top-n":
                     pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
                     pdf_docs = pdf_docs[:args.top_n]
+                    for d in pdf_docs:
+                        log.info(f"    {d['url'].split('/')[-1]} ({d['size']/1024/1024:.1f}MB)")
+
+            # Layer 3: fallback — if Playwright returned garbage (0 usable results),
+            # scan the NLR prospectus date directly via HEAD requests
+            if not pdf_docs and args.doc_type == "prospectus" and prosp_date:
+                date_prefix = prosp_date.replace("-", "")
+                dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
+                scan_base = (f"{BASE_URL}/listedco/listconews/sehk/"
+                             f"{dt_p.strftime('%Y')}/{dt_p.strftime('%m%d')}/{date_prefix}")
+                log.info(f"  Fallback: scanning {date_prefix}*.pdf (odd 1-99)...")
+                candidates = []
+                for seq in range(1, 100, 2):
+                    url = f"{scan_base}{seq:05d}.pdf"
+                    try:
+                        resp = SESSION.head(url, timeout=8, allow_redirects=True)
+                        if resp.status_code == 200:
+                            size = int(resp.headers.get("Content-Length", 0))
+                            candidates.append({"url": url, "size": size})
+                    except Exception:
+                        pass
+                    time.sleep(0.05)
+                if candidates:
+                    candidates.sort(key=lambda c: c["size"], reverse=True)
+                    pdf_docs = [candidates[0]]
+                    log.info(f"  Found {len(candidates)} PDFs → largest: "
+                             f"{pdf_docs[0]['url'].split('/')[-1]} "
+                             f"({pdf_docs[0]['size']/1024/1024:.1f}MB)")
+                else:
+                    log.warning(f"  No PDFs found on {prosp_date}")
 
             log.info(f"  → {len(pdf_docs)} file(s) to download")
 
