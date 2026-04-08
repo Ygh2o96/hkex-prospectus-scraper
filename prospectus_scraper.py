@@ -189,11 +189,10 @@ def load_stock_map() -> dict:
 # Playwright search
 # ---------------------------------------------------------------------------
 
-def search_listing_docs(browser, stock_code: str, internal_id: int,
-                        date_from: str = None, date_to: str = None) -> list[dict]:
+def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict]:
     """
     Automate HKEX Title Search: stock + category=Listing Documents.
-    date_from/date_to: DD/MM/YYYY format. If None, uses page defaults.
+    Uses actual UI interaction to ensure category is selected.
     Returns list of {title, url, date, headline}.
     """
     page = browser.new_page()
@@ -206,34 +205,36 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(4000)
 
-        # Set date range if provided (critical for stocks listed >12 months ago)
-        if date_from and date_to:
-            page.evaluate(f"""() => {{
-                // Set hidden fields that the JSF form reads
-                const fields = {{
-                    'startDate': '{date_from.replace("/","-")}',
-                    'endDate': '{date_to.replace("/","-")}',
-                }};
-                for (const [id, val] of Object.entries(fields)) {{
-                    const el = document.getElementById(id);
-                    if (el) {{ el.value = val; }}
-                }}
-                // Set the form submission fields
-                document.querySelectorAll('[name="titleSearchByAllResult.dateFromUi"]')
-                    .forEach(el => {{ el.value = '{date_from}'; }});
-                document.querySelectorAll('[name="titleSearchByAllResult.dateToUi"]')
-                    .forEach(el => {{ el.value = '{date_to}'; }});
-                // Also try to fill visible date input fields
-                document.querySelectorAll('.filter-date input[type="text"], .date-picker input, input.date-field')
-                    .forEach((el, i) => {{
-                        el.value = i === 0 ? '{date_from}' : '{date_to}';
-                        el.dispatchEvent(new Event('change', {{bubbles: true}}));
-                        el.dispatchEvent(new Event('input', {{bubbles: true}}));
-                    }});
-            }}""")
-            log.debug(f"  Date range set: {date_from} → {date_to}")
+        # Verify the Headline Category dropdown shows "Listing Documents"
+        # If URL param didn't stick, click the dropdown and select it
+        tier1_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
+        log.debug(f"  tierOneId value: {tier1_val}")
+        if tier1_val != LISTING_DOCS_CATEGORY:
+            log.info(f"  Category not set ({tier1_val}), clicking dropdown...")
+            # Try clicking the headline category dropdown and selecting Listing Documents
+            try:
+                # Find and click the headline category dropdown
+                dropdowns = page.query_selector_all(".combobox-field, .droplist-field, select")
+                for dd in dropdowns:
+                    text = dd.inner_text().strip().lower() if dd.is_visible() else ""
+                    if "headline" in text or "category" in text or "all" in text.lower():
+                        dd.click()
+                        page.wait_for_timeout(500)
+                        # Look for "Listing Documents" option
+                        options = page.query_selector_all(
+                            ".droplist-item, .combobox-item, option, li[data-value]")
+                        for opt in options:
+                            opt_text = opt.inner_text().strip()
+                            if "listing documents" in opt_text.lower():
+                                opt.click()
+                                log.info(f"  Selected: {opt_text}")
+                                page.wait_for_timeout(1000)
+                                break
+                        break
+            except Exception as e:
+                log.debug(f"  Dropdown interaction failed: {e}")
 
-        # Click search
+        # Click search button
         for sel in ["a.filter__btn-apply:not(.btn-disable)",
                     ".filter__btn-apply:not(.btn-disable)",
                     "a[class*='btn-apply']"]:
@@ -242,6 +243,7 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
                 btn.click()
                 break
 
+        # Wait for results
         try:
             page.wait_for_selector(
                 "#titleSearchResultPanel .news_headline,"
@@ -251,27 +253,22 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
             pass
         page.wait_for_timeout(2000)
 
-        # Extract PDFs with headline subcategory text
+        # Extract PDFs with headline text
         results = page.evaluate("""() => {
             const links = [];
-            // Each result row has: date, stock info, headline category, document link
             const panel = document.getElementById('titleSearchResultPanel');
             if (!panel) return links;
 
-            // Get all PDF links
             panel.querySelectorAll('a[href*=".pdf"]').forEach(a => {
                 let href = a.getAttribute('href') || '';
                 if (href.startsWith('/')) href = 'https://www1.hkexnews.hk' + href;
 
-                // Walk up to find the result container (row/div)
                 let container = a.closest('tr') || a.closest('.row') || a.parentElement?.parentElement;
                 const containerText = container ? container.innerText : '';
 
-                // Extract headline: "Listing Documents - [Offer for Subscription]"
                 const hlMatch = containerText.match(/Listing Documents\\s*-\\s*\\[([^\\]]+)\\]/i);
                 const headline = hlMatch ? hlMatch[1].trim() : '';
 
-                // Extract date: DD/MM/YYYY
                 const dtMatch = containerText.match(/(\\d{2}\\/\\d{2}\\/\\d{4})/);
                 const date = dtMatch ? dtMatch[1] : '';
 
@@ -285,7 +282,12 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
             return links;
         }""")
 
-        log.info(f"  {stock_code}: {len(results)} result(s) from HKEX")
+        # Diagnostic: log first few titles
+        if results:
+            sample = [r.get("title","")[:40] for r in results[:3]]
+            log.info(f"  {stock_code}: {len(results)} result(s) — sample: {sample}")
+        else:
+            log.info(f"  {stock_code}: 0 results")
 
     except Exception as e:
         log.error(f"  {stock_code}: search failed — {e}")
@@ -646,24 +648,11 @@ def main():
 
     # 3. Search + download
     success = skip = fail = 0
-    need_browser = args.doc_type != "prospectus"
 
-    # Context manager for Playwright (only if needed)
-    import contextlib
-
-    @contextlib.contextmanager
-    def _browser_ctx():
-        if need_browser:
-            with sync_playwright() as p:
-                b = p.chromium.launch(
-                    headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"])
-                yield b
-                b.close()
-        else:
-            yield None
-
-    with _browser_ctx() as browser:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"])
 
         for i, listing in enumerate(all_listings):
             code = listing["stock_code"]
@@ -676,92 +665,48 @@ def main():
                 continue
 
             internal_id = stock_map.get(code)
-            if not internal_id and args.doc_type != "prospectus":
+            if not internal_id:
                 log.warning(f"  {code} ({company[:30]}): no ID mapping")
                 fail += 1
                 continue
 
             log.info(f"\n[{i+1}/{len(all_listings)}] {code} {company[:40]} (prosp: {prosp_date})")
 
-            # ══════════════════════════════════════════════════════
-            # PROSPECTUS MODE: direct date scan (fast, no browser needed)
-            # OTHER MODES: use Playwright search + filter pipeline
-            # ══════════════════════════════════════════════════════
+            # Playwright search (category=Listing Documents)
+            docs = search_listing_docs(browser, code, internal_id)
+            pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
+            before = len(pdf_docs)
 
-            pdf_docs = []
-
+            # ── Filter by doc type ──
             if args.doc_type == "prospectus":
-                # Direct scan: NLR gives exact prospectus date → scan that date's PDFs
-                if not prosp_date:
-                    log.warning(f"  No prospectus date in NLR — skipping")
-                    fail += 1
-                    continue
+                # Keep only non-AP/PHIP files (YYYYMMDD* prefix, not sehk*/gem*)
+                pdf_docs = [d for d in pdf_docs
+                            if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            elif args.doc_type == "ap-phip":
+                pdf_docs = [d for d in pdf_docs
+                            if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            elif args.doc_type == "all-listed":
+                pdf_docs = [d for d in pdf_docs
+                            if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
 
-                date_prefix = prosp_date.replace("-", "")
-                dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
-                scan_base = (f"{BASE_URL}/listedco/listconews/sehk/"
-                             f"{dt_p.strftime('%Y')}/{dt_p.strftime('%m%d')}/{date_prefix}")
-                log.info(f"  Scanning {date_prefix}*.pdf ...")
-                candidates = []
-                for seq in range(1, 100, 2):  # odd seqs only
-                    url = f"{scan_base}{seq:05d}.pdf"
+            # ── Size filter (HEAD on survivors only) ──
+            if pdf_docs and args.filter in ("smart", "top-n"):
+                log.info(f"  Checking sizes for {len(pdf_docs)} files...")
+                for doc in pdf_docs:
                     try:
-                        resp = SESSION.head(url, timeout=8, allow_redirects=True)
-                        if resp.status_code == 200:
-                            size = int(resp.headers.get("Content-Length", 0))
-                            candidates.append({"url": url, "size": size})
+                        resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
+                        doc["size"] = int(resp.headers.get("Content-Length", 0))
                     except Exception:
-                        pass
-                    time.sleep(0.05)
+                        doc["size"] = 0
+                    time.sleep(0.1)
+                if args.filter == "smart":
+                    min_bytes = int(args.min_size_mb * 1024 * 1024)
+                    pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
+                elif args.filter == "top-n":
+                    pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
+                    pdf_docs = pdf_docs[:args.top_n]
 
-                if candidates:
-                    candidates.sort(key=lambda c: c["size"], reverse=True)
-                    pdf_docs = [candidates[0]]  # largest = prospectus
-                    log.info(f"  {len(candidates)} PDFs found → largest: "
-                             f"{pdf_docs[0]['url'].split('/')[-1]} "
-                             f"({pdf_docs[0]['size']/1024/1024:.1f}MB)")
-                else:
-                    log.warning(f"  No PDFs found on {prosp_date}")
-
-            else:
-                # Playwright search for other doc types
-                search_from = None
-                search_to = None
-                if prosp_date:
-                    dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
-                    search_from = (dt_p - timedelta(days=args.date_margin)).strftime("%d/%m/%Y")
-                    search_to = (dt_p + timedelta(days=args.date_margin + 30)).strftime("%d/%m/%Y")
-
-                docs = search_listing_docs(browser, code, internal_id,
-                                           date_from=search_from, date_to=search_to)
-                pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
-                before = len(pdf_docs)
-
-                # Filename filter
-                if args.doc_type == "ap-phip":
-                    pdf_docs = [d for d in pdf_docs
-                                if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
-                elif args.doc_type == "all-listed":
-                    pdf_docs = [d for d in pdf_docs
-                                if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
-
-                # Size filter
-                if pdf_docs and args.filter in ("smart", "top-n"):
-                    log.info(f"  Checking sizes for {len(pdf_docs)} files...")
-                    for doc in pdf_docs:
-                        try:
-                            resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
-                            doc["size"] = int(resp.headers.get("Content-Length", 0))
-                        except Exception:
-                            doc["size"] = 0
-                        time.sleep(0.1)
-                    if args.filter == "smart":
-                        min_bytes = int(args.min_size_mb * 1024 * 1024)
-                        pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
-                    elif args.filter == "top-n":
-                        pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
-                        pdf_docs = pdf_docs[:args.top_n]
-
+            if before != len(pdf_docs):
                 log.info(f"  Filtered: {before} → {len(pdf_docs)}")
 
             log.info(f"  → {len(pdf_docs)} file(s) to download")
@@ -779,6 +724,8 @@ def main():
                 "docs_found": len(pdf_docs), "ts": datetime.utcnow().isoformat()
             }
             time.sleep(RATE_LIMIT)
+
+        browser.close()
 
     save_state(state)
 
