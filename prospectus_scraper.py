@@ -362,6 +362,8 @@ def _manage_cron(args):
     elif args.filter == "top-n":
         cmd_parts += ["--top-n", str(args.top_n)]
 
+    cmd_parts += ["--doc-type", args.doc_type]
+
     output_dir = args.output_dir or str(DOWNLOAD_DIR)
     cmd_parts += ["--output-dir", output_dir]
 
@@ -530,6 +532,13 @@ def main():
                         help="Min file size in MB for 'smart' filter (default: 1.0)")
     parser.add_argument("--top-n", type=int, default=3,
                         help="Number of largest files to keep for 'top-n' filter (default: 3)")
+    parser.add_argument("--doc-type", type=str, default="prospectus",
+                        choices=["prospectus", "all-listed", "ap-phip", "everything"],
+                        help="Which documents to download: "
+                             "prospectus=only prospectus (YYYYMMDD* files, largest), "
+                             "all-listed=all listed-co docs (exclude sehk*/gem*), "
+                             "ap-phip=only AP/PHIP (sehk*/gem* files), "
+                             "everything=no filename filter (default: prospectus)")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Override download directory (default: downloads/prospectuses)")
 
@@ -674,28 +683,69 @@ def main():
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # Apply size filter if not downloading everything
+            # ── Fast filename-based doc-type filter (no HTTP calls) ──
+            # sehk*/gem* prefix = AP system (Application Proof, PHIP, OC)
+            # YYYYMMDD* prefix  = Listed company docs (Prospectus, Allotment, etc.)
+            def _classify(url):
+                fname = url.split("/")[-1].lower()
+                return "ap" if fname.startswith(("sehk", "gem")) else "listed"
+
+            before = len(pdf_docs)
+            if args.doc_type == "prospectus":
+                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "listed"]
+            elif args.doc_type == "all-listed":
+                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "listed"]
+            elif args.doc_type == "ap-phip":
+                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "ap"]
+            # "everything" = no filter
+
+            if before != len(pdf_docs):
+                log.info(f"  Doc-type '{args.doc_type}': {before} → {len(pdf_docs)} files")
+
+            # ── Size filter (HEAD requests only when needed) ──
             if args.filter != "all" and pdf_docs:
-                log.info(f"  Checking file sizes for {len(pdf_docs)} PDFs...")
-                for doc in pdf_docs:
-                    try:
-                        resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
-                        doc["size"] = int(resp.headers.get("Content-Length", 0))
-                    except Exception:
-                        doc["size"] = 0
-                    time.sleep(0.2)
+                # Only do HEAD requests if we actually need sizes
+                need_sizes = (args.filter in ("smart", "top-n"))
+                if need_sizes:
+                    log.info(f"  Checking sizes for {len(pdf_docs)} files...")
+                    for doc in pdf_docs:
+                        try:
+                            resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
+                            doc["size"] = int(resp.headers.get("Content-Length", 0))
+                        except Exception:
+                            doc["size"] = 0
+                        time.sleep(0.15)
 
                 if args.filter == "smart":
                     min_bytes = int(args.min_size_mb * 1024 * 1024)
                     before = len(pdf_docs)
-                    pdf_docs = [d for d in pdf_docs if d["size"] >= min_bytes]
+                    pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
                     log.info(f"  Smart filter (≥{args.min_size_mb}MB): {before} → {len(pdf_docs)} files")
 
                 elif args.filter == "top-n":
                     pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
                     pdf_docs = pdf_docs[:args.top_n]
-                    log.info(f"  Top-{args.top_n} largest: "
-                             + ", ".join(f"{d['url'].split('/')[-1]}({d['size']/1024/1024:.1f}MB)" for d in pdf_docs))
+                    log.info(f"  Top-{args.top_n}: "
+                             + ", ".join(f"{d['url'].split('/')[-1]}({d.get('size',0)/1024/1024:.1f}MB)"
+                                         for d in pdf_docs))
+
+            # ── Shortcut: --doc-type prospectus + --filter all → take largest only ──
+            if args.doc_type == "prospectus" and args.filter == "all" and len(pdf_docs) > 1:
+                # Even without HEAD, prospectus is always the largest listed-co doc.
+                # Do a quick HEAD for just these filtered files to pick the biggest.
+                log.info(f"  Prospectus mode: finding largest among {len(pdf_docs)} candidates...")
+                for doc in pdf_docs:
+                    if "size" not in doc:
+                        try:
+                            resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
+                            doc["size"] = int(resp.headers.get("Content-Length", 0))
+                        except Exception:
+                            doc["size"] = 0
+                        time.sleep(0.15)
+                pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
+                pdf_docs = pdf_docs[:1]
+                log.info(f"  → {pdf_docs[0]['url'].split('/')[-1]} "
+                         f"({pdf_docs[0].get('size',0)/1024/1024:.1f}MB)")
 
             # Download
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
