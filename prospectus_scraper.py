@@ -235,6 +235,39 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
                 # Step 2: Wait for headline category dropdown to become enabled/visible
                 page.wait_for_timeout(2000)  # give page time to re-render
 
+                # Diagnostic: what does the dropdown area look like NOW?
+                post_switch = page.evaluate("""() => {
+                    const info = [];
+                    // Check all combobox-fields after search type switch
+                    document.querySelectorAll('a.combobox-field').forEach(el => {
+                        info.push({
+                            text: el.innerText.trim().substring(0, 40),
+                            value: el.getAttribute('data-value') || el.getAttribute('value') || '',
+                            visible: el.offsetParent !== null,
+                            parent: el.parentElement?.className?.substring(0, 50) || '',
+                            grandparent: el.parentElement?.parentElement?.className?.substring(0, 50) || ''
+                        });
+                    });
+                    // Also check tierOneId
+                    const t1 = document.getElementById('tierOneId');
+                    return {
+                        fields: info,
+                        tierOneId: t1?.value || 'NOT FOUND',
+                        tierOneDisabled: t1?.disabled || false
+                    };
+                }""")
+                log.info(f"  Post-switch tierOneId={post_switch.get('tierOneId')}")
+                for f in post_switch.get('fields', []):
+                    log.info(f"    A.combobox-field: text='{f['text']}' value='{f['value']}' "
+                             f"visible={f['visible']} parent='{f['parent'][:30]}'")
+
+                # Take screenshot after switch
+                try:
+                    page.screenshot(path="/tmp/hkex_debug2.png", full_page=False)
+                    log.info(f"  Screenshot: /tmp/hkex_debug2.png")
+                except Exception:
+                    pass
+
                 # Try multiple selectors — page may restructure after search type change
                 tier1_trigger = None
                 for sel in ['.tier1-wrap .combobox-field',
