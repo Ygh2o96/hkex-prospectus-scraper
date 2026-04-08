@@ -657,24 +657,55 @@ def main():
 
             before = len(pdf_docs)
             if args.doc_type == "prospectus":
-                # Match by NLR prospectus date prefix in filename
                 if prosp_date:
                     date_prefix = prosp_date.replace("-", "")  # "2023-12-27" → "20231227"
-                    pdf_docs = [d for d in pdf_docs
-                                if d["url"].split("/")[-1].startswith(date_prefix)]
-                    log.info(f"  Date-prefix filter ({date_prefix}*): {before} → {len(pdf_docs)}")
-                    # If multiple matches on same date, keep largest
-                    if len(pdf_docs) > 1:
-                        for doc in pdf_docs:
+
+                    # Try 1: match from Playwright results
+                    matched = [d for d in pdf_docs
+                               if d["url"].split("/")[-1].startswith(date_prefix)]
+
+                    # Try 2: if Playwright didn't return the right docs,
+                    # scan the date's PDFs directly (bypasses broken JSF search)
+                    if not matched:
+                        dt_p = datetime.strptime(prosp_date, "%Y-%m-%d")
+                        yyyy = dt_p.strftime("%Y")
+                        mmdd = dt_p.strftime("%m%d")
+                        scan_base = f"{BASE_URL}/listedco/listconews/sehk/{yyyy}/{mmdd}/{date_prefix}"
+                        log.info(f"  Direct scan: {date_prefix}*.pdf (odd seq 1-99)...")
+                        candidates = []
+                        for seq in range(1, 100, 2):
+                            url = f"{scan_base}{seq:05d}.pdf"
                             try:
-                                resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
-                                doc["size"] = int(resp.headers.get("Content-Length", 0))
+                                resp = SESSION.head(url, timeout=8, allow_redirects=True)
+                                if resp.status_code == 200:
+                                    size = int(resp.headers.get("Content-Length", 0))
+                                    candidates.append({"url": url, "size": size})
                             except Exception:
-                                doc["size"] = 0
-                        pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
-                        pdf_docs = pdf_docs[:1]
-                        log.info(f"  Largest: {pdf_docs[0]['url'].split('/')[-1]} "
-                                 f"({pdf_docs[0]['size']/1024/1024:.1f}MB)")
+                                pass
+                            time.sleep(0.05)
+                        if candidates:
+                            candidates.sort(key=lambda c: c["size"], reverse=True)
+                            matched = [candidates[0]]  # largest = prospectus
+                            log.info(f"  Found {len(candidates)} PDFs, "
+                                     f"largest: {matched[0]['url'].split('/')[-1]} "
+                                     f"({matched[0]['size']/1024/1024:.1f}MB)")
+                        else:
+                            log.warning(f"  No PDFs found on {prosp_date}")
+
+                    # If multiple Playwright matches on same date, keep largest
+                    elif len(matched) > 1:
+                        for doc in matched:
+                            if "size" not in doc:
+                                try:
+                                    resp = SESSION.head(doc["url"], timeout=8, allow_redirects=True)
+                                    doc["size"] = int(resp.headers.get("Content-Length", 0))
+                                except Exception:
+                                    doc["size"] = 0
+                        matched.sort(key=lambda d: d.get("size", 0), reverse=True)
+                        matched = matched[:1]
+
+                    pdf_docs = matched
+                    log.info(f"  Prospectus: {before} → {len(pdf_docs)}")
                 else:
                     log.warning(f"  No prospectus date in NLR — skipping")
                     pdf_docs = []
