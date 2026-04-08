@@ -209,61 +209,51 @@ def search_listing_docs(browser, stock_code: str, internal_id: int) -> list[dict
         # If URL param didn't stick, click the dropdown and select it
         tier1_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
         if tier1_val != LISTING_DOCS_CATEGORY:
-            log.info(f"  Category={tier1_val}, fixing search type + category...")
+            log.info(f"  Category={tier1_val}, fixing...")
             try:
-                # Step 1: Switch search type from "ALL" to enable headline category
-                # The search type dropdown (class searchType) shows "ALL" (rbAll)
-                # which DISABLES the headline category dropdown.
-                # Need to select the post-2007 option that enables it.
+                # Step 1: Switch search type to "Headline Category" (enables the filter)
                 search_type_dd = page.query_selector('.searchType .combobox-field')
                 if search_type_dd:
                     search_type_dd.click()
                     page.wait_for_timeout(500)
-                    # Find the option for "Headline Category" / post-2007
-                    st_items = page.query_selector_all('.searchType .droplist-item')
-                    if not st_items:
-                        st_items = page.query_selector_all('.droplist-item')
+                    st_items = page.query_selector_all('.droplist-item')
                     for item in st_items:
                         txt = item.inner_text().strip().lower()
-                        if item.is_visible() and ("headline" in txt or "2007" in txt
-                                                   or "after" in txt or "category" in txt):
+                        if item.is_visible() and ("headline" in txt or "category" in txt):
                             item.click()
                             log.info(f"  ✓ Search type → '{item.inner_text().strip()[:40]}'")
-                            page.wait_for_timeout(1000)
+                            page.wait_for_timeout(1500)
                             break
 
-                # Step 2: Wait for headline category dropdown to become enabled/visible
-                page.wait_for_timeout(2000)
+                # Step 2: Force-set the hidden field + trigger HKEX's JS handler
+                page.evaluate(f"""() => {{
+                    // Set the hidden field directly
+                    const t1 = document.getElementById('tierOneId');
+                    if (t1) t1.value = '{LISTING_DOCS_CATEGORY}';
+                    const t2 = document.getElementById('tierTwoId');
+                    if (t2) t2.value = '-2';
+                    // Update the visible dropdown text
+                    const fields = document.querySelectorAll('.tier1-wrap .combobox-field, .searchType-Categroy .combobox-field');
+                    fields.forEach(f => {{
+                        if (f.getAttribute('data-value') === '-2' || f.getAttribute('value') === '-2') {{
+                            f.setAttribute('data-value', '{LISTING_DOCS_CATEGORY}');
+                            f.setAttribute('value', '{LISTING_DOCS_CATEGORY}');
+                            f.textContent = 'Listing Documents';
+                        }}
+                    }});
+                    // Trigger jQuery change event that HKEX JS listens on
+                    if (typeof jQuery !== 'undefined') {{
+                        jQuery('.tier1-wrap .combobox-field').trigger('change');
+                    }}
+                }}""")
+                page.wait_for_timeout(500)
 
-                # Try multiple selectors — page may restructure after search type change
-                tier1_trigger = None
-                # After switch, the visible headline category dropdown has value="-2" text="ALL"
-                all_fields = page.query_selector_all('a.combobox-field')
-                for f in all_fields:
-                    try:
-                        val = f.get_attribute('data-value') or f.get_attribute('value') or ''
-                        txt = f.inner_text().strip()
-                        if f.is_visible() and val == '-2' and txt.upper() == 'ALL':
-                            tier1_trigger = f
-                            log.info(f"  Found headline dropdown: text='{txt}' value='{val}'")
-                            break
-                    except Exception:
-                        continue
+                # Verify
+                new_val = page.evaluate("document.getElementById('tierOneId')?.value || ''")
+                log.info(f"  tierOneId after fix: {new_val}")
 
-                if tier1_trigger:
-                    tier1_trigger.click()
-                    page.wait_for_timeout(800)
-                    items = page.query_selector_all('.droplist-item')
-                    for item in items:
-                        if item.is_visible() and "listing documents" in item.inner_text().lower():
-                            item.click()
-                            log.info(f"  ✓ Category → 'Listing Documents'")
-                            page.wait_for_timeout(1000)
-                            break
-                    else:
-                        log.warning(f"  'Listing Documents' not found in dropdown")
             except Exception as e:
-                log.warning(f"  Dropdown error: {e}")
+                log.warning(f"  Category fix error: {e}")
 
         # Click SEARCH button (actual class: filter__btn-applyFilters-js)
         for sel in ["a.filter__btn-applyFilters-js",
