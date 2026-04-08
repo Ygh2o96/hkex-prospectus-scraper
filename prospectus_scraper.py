@@ -786,10 +786,11 @@ def main():
 
             # Download
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
+            date_prefix = prosp_date.replace("-", "") if prosp_date else "00000000"
             for doc in pdf_docs:
                 url = doc["url"]
                 filename = url.split("/")[-1]
-                dest = DOWNLOAD_DIR / f"{code}_{safe_name}" / filename
+                dest = DOWNLOAD_DIR / f"{date_prefix}_{code}_{safe_name}" / filename
                 if download_pdf(url, dest, state):
                     success += 1
 
