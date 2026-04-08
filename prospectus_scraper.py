@@ -50,6 +50,18 @@ ACTIVESTOCK_URL = f"{BASE_URL}/ncms/script/eds/activestock_sehk_e.json"
 TITLESEARCH_URL = f"{BASE_URL}/search/titlesearch.xhtml"
 LISTING_DOCS_CATEGORY = "30000"
 
+# HKEX Title Search tier2 subcategory codes (under tier1=30000 Listing Documents)
+# Source: /ncms/script/eds/tiertwo_e.json
+TIER2_CODES = {
+    "prospectus": "30700",   # Offer for Subscription = Global Offering / Prospectus
+    "offer-sale": "30600",   # Offer for Sale
+    "introduction": "30500", # Introduction
+    "rights": "31100",       # Rights Issue
+    "open-offer": "30800",   # Open Offer
+    "supplemental": "31200", # Supplementary Listing Document
+    "all": "-2",             # All subcategories
+}
+
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", "downloads/prospectuses"))
 STATE_FILE = Path(os.environ.get("STATE_FILE", "state/prospectus_downloaded.json"))
 RATE_LIMIT = float(os.environ.get("RATE_LIMIT_SECONDS", "2.0"))
@@ -178,9 +190,11 @@ def load_stock_map() -> dict:
 # ---------------------------------------------------------------------------
 
 def search_listing_docs(browser, stock_code: str, internal_id: int,
-                        date_from: str, date_to: str) -> list[dict]:
+                        date_from: str, date_to: str,
+                        tier2_code: str = "-2") -> list[dict]:
     """
     Automate HKEX Title Search page with Playwright.
+    tier2_code: -2=all listing docs, 30700=prospectus only, etc.
     Returns list of {title, url, date} for PDF results.
     """
     page = browser.new_page()
@@ -188,7 +202,7 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
     results = []
 
     try:
-        # Navigate with pre-filled stock + category
+        # Navigate with pre-filled stock + headline category
         url = (f"{TITLESEARCH_URL}?lang=EN&market=SEHK"
                f"&stockId={internal_id}&category={LISTING_DOCS_CATEGORY}")
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
@@ -196,7 +210,7 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
         # Wait for JS framework to initialize
         page.wait_for_timeout(4000)
 
-        # Set the date range via JS (hidden inputs populated by client JS)
+        # Set date range + subcategory via JS hidden fields
         df = datetime.strptime(date_from, "%Y%m%d")
         dt = datetime.strptime(date_to, "%Y%m%d")
         page.evaluate(f"""() => {{
@@ -204,11 +218,15 @@ def search_listing_docs(browser, stock_code: str, internal_id: int,
             const ed = document.getElementById('endDate');
             if (sd) sd.value = '{df.strftime("%Y-%m-%d")}';
             if (ed) ed.value = '{dt.strftime("%Y-%m-%d")}';
-            // Also set the visible date fields
             const fromUi = document.querySelector('[name="titleSearchByAllResult.dateFromUi"]');
             const toUi = document.querySelector('[name="titleSearchByAllResult.dateToUi"]');
             if (fromUi) fromUi.value = '{df.strftime("%d/%m/%Y")}';
             if (toUi) toUi.value = '{dt.strftime("%d/%m/%Y")}';
+            // Set headline subcategory for server-side filtering
+            const t1 = document.getElementById('tierOneId');
+            const t2 = document.getElementById('tierTwoId');
+            if (t1) t1.value = '{LISTING_DOCS_CATEGORY}';
+            if (t2) t2.value = '{tier2_code}';
         }}""")
 
         # Find and click the search/apply button
@@ -535,10 +553,10 @@ def main():
     parser.add_argument("--doc-type", type=str, default="prospectus",
                         choices=["prospectus", "all-listed", "ap-phip", "everything"],
                         help="Which documents to download: "
-                             "prospectus=only prospectus (YYYYMMDD* files, largest), "
-                             "all-listed=all listed-co docs (exclude sehk*/gem*), "
+                             "prospectus=only Global Offering doc (fastest, server-side filter), "
+                             "all-listed=all listed-co Listing Documents, "
                              "ap-phip=only AP/PHIP (sehk*/gem* files), "
-                             "everything=no filename filter (default: prospectus)")
+                             "everything=no filter (default: prospectus)")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Override download directory (default: downloads/prospectuses)")
 
@@ -677,75 +695,52 @@ def main():
                 date_to = datetime.now().strftime("%Y%m%d")
                 date_from = (datetime.now() - timedelta(days=90)).strftime("%Y%m%d")
 
-            # Search
-            docs = search_listing_docs(browser, code, internal_id, date_from, date_to)
+            # ── Determine tier2 code for server-side filtering ──
+            # prospectus  → tier2=30700 (HKEX returns ONLY the Global Offering doc)
+            # all-listed  → tier2=-2    (all Listing Documents subcategories)
+            # ap-phip     → tier2=-2    (get everything, filter by filename after)
+            # everything  → tier2=-2
+            tier2 = TIER2_CODES.get("prospectus") if args.doc_type == "prospectus" \
+                    else TIER2_CODES["all"]
+
+            # Search HKEX
+            docs = search_listing_docs(browser, code, internal_id,
+                                       date_from, date_to, tier2_code=tier2)
 
             # Filter to PDFs only
             pdf_docs = [d for d in docs if d.get("url", "").endswith(".pdf")]
 
-            # ── Fast filename-based doc-type filter (no HTTP calls) ──
-            # sehk*/gem* prefix = AP system (Application Proof, PHIP, OC)
-            # YYYYMMDD* prefix  = Listed company docs (Prospectus, Allotment, etc.)
-            def _classify(url):
-                fname = url.split("/")[-1].lower()
-                return "ap" if fname.startswith(("sehk", "gem")) else "listed"
+            # ── Filename-based filter (only needed for ap-phip / everything) ──
+            # sehk*/gem* = AP system docs | YYYYMMDD* = listed-co docs
+            if args.doc_type == "ap-phip":
+                pdf_docs = [d for d in pdf_docs
+                            if d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
+            elif args.doc_type in ("prospectus", "all-listed"):
+                # Drop any AP-system docs that leaked through
+                pdf_docs = [d for d in pdf_docs
+                            if not d["url"].split("/")[-1].lower().startswith(("sehk", "gem"))]
 
-            before = len(pdf_docs)
-            if args.doc_type == "prospectus":
-                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "listed"]
-            elif args.doc_type == "all-listed":
-                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "listed"]
-            elif args.doc_type == "ap-phip":
-                pdf_docs = [d for d in pdf_docs if _classify(d["url"]) == "ap"]
-            # "everything" = no filter
-
-            if before != len(pdf_docs):
-                log.info(f"  Doc-type '{args.doc_type}': {before} → {len(pdf_docs)} files")
-
-            # ── Size filter (HEAD requests only when needed) ──
-            if args.filter != "all" and pdf_docs:
-                # Only do HEAD requests if we actually need sizes
-                need_sizes = (args.filter in ("smart", "top-n"))
-                if need_sizes:
-                    log.info(f"  Checking sizes for {len(pdf_docs)} files...")
-                    for doc in pdf_docs:
-                        try:
-                            resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
-                            doc["size"] = int(resp.headers.get("Content-Length", 0))
-                        except Exception:
-                            doc["size"] = 0
-                        time.sleep(0.15)
+            # ── Size filter (only when needed) ──
+            if args.filter in ("smart", "top-n") and pdf_docs:
+                log.info(f"  Checking sizes for {len(pdf_docs)} files...")
+                for doc in pdf_docs:
+                    try:
+                        resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
+                        doc["size"] = int(resp.headers.get("Content-Length", 0))
+                    except Exception:
+                        doc["size"] = 0
+                    time.sleep(0.15)
 
                 if args.filter == "smart":
                     min_bytes = int(args.min_size_mb * 1024 * 1024)
                     before = len(pdf_docs)
                     pdf_docs = [d for d in pdf_docs if d.get("size", 0) >= min_bytes]
-                    log.info(f"  Smart filter (≥{args.min_size_mb}MB): {before} → {len(pdf_docs)} files")
-
+                    log.info(f"  Smart filter (≥{args.min_size_mb}MB): {before} → {len(pdf_docs)}")
                 elif args.filter == "top-n":
                     pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
                     pdf_docs = pdf_docs[:args.top_n]
-                    log.info(f"  Top-{args.top_n}: "
-                             + ", ".join(f"{d['url'].split('/')[-1]}({d.get('size',0)/1024/1024:.1f}MB)"
-                                         for d in pdf_docs))
 
-            # ── Shortcut: --doc-type prospectus + --filter all → take largest only ──
-            if args.doc_type == "prospectus" and args.filter == "all" and len(pdf_docs) > 1:
-                # Even without HEAD, prospectus is always the largest listed-co doc.
-                # Do a quick HEAD for just these filtered files to pick the biggest.
-                log.info(f"  Prospectus mode: finding largest among {len(pdf_docs)} candidates...")
-                for doc in pdf_docs:
-                    if "size" not in doc:
-                        try:
-                            resp = SESSION.head(doc["url"], timeout=10, allow_redirects=True)
-                            doc["size"] = int(resp.headers.get("Content-Length", 0))
-                        except Exception:
-                            doc["size"] = 0
-                        time.sleep(0.15)
-                pdf_docs.sort(key=lambda d: d.get("size", 0), reverse=True)
-                pdf_docs = pdf_docs[:1]
-                log.info(f"  → {pdf_docs[0]['url'].split('/')[-1]} "
-                         f"({pdf_docs[0].get('size',0)/1024/1024:.1f}MB)")
+            log.info(f"  → {len(pdf_docs)} file(s) to download")
 
             # Download
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
