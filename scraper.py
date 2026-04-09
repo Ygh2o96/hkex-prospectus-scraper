@@ -202,10 +202,34 @@ def download_pdf(item: dict, state: dict) -> dict | None:
         log.debug(f"  ⏭ Already downloaded: {item['filename']}")
         return None
 
+    # Descriptive filename: DATE_CompanyName_DocType.pdf
+    doc_date = item.get("date", "unknown")
+    # Parse date from DD/MM/YYYY to YYYY-MM-DD
+    try:
+        from datetime import datetime as _dt
+        dt = _dt.strptime(doc_date, "%d/%m/%Y")
+        date_str = dt.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = doc_date.replace("/", "-") if doc_date else "unknown"
+
+    # Shorten doc type for filename
+    doc_type = item.get("doc_type", "")
+    doc_lower = doc_type.lower()
+    # Extract submission number if present (e.g., "1st", "2nd")
+    sub_match = re.search(r'(\d+)(?:st|nd|rd|th)', doc_lower)
+    sub_num = f"_{sub_match.group(1)}" if sub_match else ""
+    type_tag = f"AP{sub_num}" if "application proof" in doc_lower else \
+               f"PHIP{sub_num}" if "phip" in doc_lower or "post hearing" in doc_lower else \
+               f"Prospectus{sub_num}" if "prospectus" in doc_lower else \
+               f"Supplemental{sub_num}" if "supplemental" in doc_lower else \
+               re.sub(r'[<>:"/\\|?*]', '_', doc_type)[:20]
+
+    safe_name = item["safe_name"]
+    desc_filename = f"{date_str}_{safe_name}_{type_tag}.pdf"
+
     board_dir = "MainBoard" if item["board"] == "main" else "GEM"
-    dest_dir = DOWNLOAD_DIR / board_dir / item["safe_name"]
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest_file = dest_dir / item["filename"]
+    dest_file = DOWNLOAD_DIR / board_dir / desc_filename
+    dest_file.parent.mkdir(parents=True, exist_ok=True)
 
     if dest_file.exists():
         log.debug(f"  ⏭ File exists: {dest_file}")

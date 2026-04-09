@@ -887,17 +887,17 @@ def main():
 
             log.info(f"  → {len(pdf_docs)} file(s) to download")
 
-            # Download
+            # Download with descriptive filenames
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
-            date_prefix = prosp_date.replace("-", "") if prosp_date else "00000000"
+            date_str = prosp_date if prosp_date else "0000-00-00"
             sponsor_tag = sponsors_to_tag(sponsors)
-            folder_name = f"{date_prefix}_{code}_{safe_name}"
+            base_name = f"{date_str}_{code}_{safe_name}"
             if sponsor_tag:
-                folder_name += f"_{sponsor_tag}"
-            for doc in pdf_docs:
+                base_name += f"_{sponsor_tag}"
+            for idx, doc in enumerate(pdf_docs):
                 url = doc["url"]
-                filename = url.split("/")[-1]
-                dest = DOWNLOAD_DIR / folder_name / filename
+                suffix = f"_{idx+1}" if len(pdf_docs) > 1 else ""
+                dest = DOWNLOAD_DIR / f"{base_name}{suffix}.pdf"
                 if download_pdf(url, dest, state):
                     success += 1
 
