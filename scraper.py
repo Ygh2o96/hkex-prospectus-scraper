@@ -343,6 +343,7 @@ def main():
         result = download_pdf(item, state)
         if result:
             success_count += 1
+        save_state(state)  # crash-safe: save after every download
 
     save_state(state)
 
