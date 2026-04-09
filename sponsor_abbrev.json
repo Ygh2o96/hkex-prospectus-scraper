@@ -204,7 +204,21 @@
     "Guotai Junan Securities (Hong Kong) Limited": "GUOTAI",
     "TFI Capital Limited": "TFI",
     "China International Capital Corporation China Galaxy International Securities (Hong Kong) Co., Limited": "CHINA",
-    "China International Capital Corporation Morgan Stanley Asia Limited": "CHINA"
+    "China International Capital Corporation Morgan Stanley Asia Limited": "CHINA",
+    "BOCOM International Securities Limited": "BOCOM",
+    "CLSA Limited": "CLSA",
+    "GF Securities (Hong Kong) Brokerage Limited": "GF",
+    "Haitong International Securities Company Limited": "HAITONG",
+    "ICBC International Securities Limited": "ICBCI",
+    "Orient Securities (Hong Kong) Limited": "ORIENT-SEC",
+    "SDIC Securities (Hong Kong) Limited": "SDIC",
+    "Shenwan Hongyuan Securities (H.K.) Limited": "SWS",
+    "Sun Securities Limited": "SUN",
+    "TFI Securities and Futures Limited": "TFI",
+    "Zhongtai International Securities Limited": "ZHONGTAI",
+    "Goldlink Securities Limited": "GOLDLINK",
+    "Guolian Securities International Capital Co., Limited": "GUOLIAN",
+    "Ping An Securities (Hong Kong) Company Limited": "PINGAN"
   },
   "table": [
     {
@@ -284,7 +298,9 @@
     {
       "abbreviation": "BOCOM",
       "canonical": "BOCOM International (Asia) Limited",
-      "variants": []
+      "variants": [
+        "BOCOM International Securities Limited"
+      ]
     },
     {
       "abbreviation": "BOSC",
@@ -391,7 +407,8 @@
       "abbreviation": "CLSA",
       "canonical": "CLSA Equity Capital Markets Limited",
       "variants": [
-        "CLSA Capital Markets Limited"
+        "CLSA Capital Markets Limited",
+        "CLSA Limited"
       ]
     },
     {
@@ -548,7 +565,9 @@
     {
       "abbreviation": "GF",
       "canonical": "GF Capital (Hong Kong) Limited",
-      "variants": []
+      "variants": [
+        "GF Securities (Hong Kong) Brokerage Limited"
+      ]
     },
     {
       "abbreviation": "GIRAFFE",
@@ -558,7 +577,9 @@
     {
       "abbreviation": "GOLDLINK",
       "canonical": "Goldlink Capital (Corporate Finance) Limited",
-      "variants": []
+      "variants": [
+        "Goldlink Securities Limited"
+      ]
     },
     {
       "abbreviation": "GRAM",
@@ -615,7 +636,8 @@
       "abbreviation": "HAITONG",
       "canonical": "Haitong International Capital Limited",
       "variants": [
-        "Hai Tong Capital (HK) Limited"
+        "Hai Tong Capital (HK) Limited",
+        "Haitong International Securities Company Limited"
       ]
     },
     {
@@ -666,7 +688,8 @@
       "abbreviation": "ICBCI",
       "canonical": "ICBC International Capital Limited",
       "variants": [
-        "ICBC International Limited"
+        "ICBC International Limited",
+        "ICBC International Securities Limited"
       ]
     },
     {
@@ -807,7 +830,9 @@
     {
       "abbreviation": "PINGAN",
       "canonical": "Ping An of China Capital (Hong Kong) Company Limited",
-      "variants": []
+      "variants": [
+        "Ping An Securities (Hong Kong) Company Limited"
+      ]
     },
     {
       "abbreviation": "PIPER",
@@ -940,7 +965,8 @@
       "canonical": "Shenwan Hongyuan Capital (H.K.) Limited",
       "variants": [
         "Shenyin Wanguo Capital (H.K.) Limited",
-        "Shenyin Wanguo Capital (HK) Limited"
+        "Shenyin Wanguo Capital (HK) Limited",
+        "Shenwan Hongyuan Securities (H.K.) Limited"
       ]
     },
     {
@@ -963,7 +989,9 @@
     {
       "abbreviation": "TFI",
       "canonical": "TFI Capital Limited",
-      "variants": []
+      "variants": [
+        "TFI Securities and Futures Limited"
+      ]
     },
     {
       "abbreviation": "TITAN",
@@ -1043,11 +1071,33 @@
     {
       "abbreviation": "ZHONGTAI",
       "canonical": "Zhongtai International Capital Limited",
-      "variants": []
+      "variants": [
+        "Zhongtai International Securities Limited"
+      ]
     },
     {
       "abbreviation": "ZIJING",
       "canonical": "Zijing Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ORIENT-SEC",
+      "canonical": "Orient Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SDIC",
+      "canonical": "SDIC Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SUN",
+      "canonical": "Sun Securities Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GUOLIAN",
+      "canonical": "Guolian Securities International Capital Co., Limited",
       "variants": []
     }
   ]
