@@ -187,6 +187,20 @@ def parse_nlr(filepath: Path) -> list[dict]:
 
     listings = []
 
+    def _parse_sponsors(raw):
+        """Extract list of sponsor names from NLR cell value."""
+        if not raw:
+            return []
+        s = str(raw).strip()
+        # Split on / or /\n (NLR uses both)
+        parts = re.split(r'\s*/\s*\n?|\n/', s)
+        sponsors = []
+        for p in parts:
+            p = p.strip().rstrip('/')
+            if p and len(p) > 3 and 'N/A' not in p.upper():
+                sponsors.append(p)
+        return sponsors
+
     if filepath.suffix.lower() == '.xls':
         # Old Excel format — use xlrd
         wb = xlrd.open_workbook(str(filepath))
@@ -196,6 +210,7 @@ def parse_nlr(filepath: Path) -> list[dict]:
             if len(row) < 5:
                 continue
             stock_code, company, prosp_date, list_date = row[1], row[2], row[3], row[4]
+            sponsors_raw = row[5] if len(row) > 5 else None
             if not stock_code or not company:
                 continue
             code = str(int(stock_code) if isinstance(stock_code, float) else stock_code).strip().zfill(5)
@@ -206,6 +221,7 @@ def parse_nlr(filepath: Path) -> list[dict]:
                 "company": str(company).strip(),
                 "prospectus_date": to_date(prosp_date),
                 "listing_date": to_date(list_date),
+                "sponsors": _parse_sponsors(sponsors_raw),
             })
     else:
         # .xlsx — use openpyxl
@@ -213,6 +229,7 @@ def parse_nlr(filepath: Path) -> list[dict]:
         ws = wb.active or wb[wb.sheetnames[0]]
         for row in ws.iter_rows(min_row=3, values_only=True):
             stock_code, company, prosp_date, list_date = row[1], row[2], row[3], row[4]
+            sponsors_raw = row[5] if len(row) > 5 else None
             if not stock_code or not company:
                 continue
             if str(stock_code).strip() in ('"', ''):
@@ -225,6 +242,7 @@ def parse_nlr(filepath: Path) -> list[dict]:
                 "company": str(company).strip(),
                 "prospectus_date": to_date(prosp_date),
                 "listing_date": to_date(list_date),
+                "sponsors": _parse_sponsors(sponsors_raw),
             })
         wb.close()
 
@@ -264,6 +282,51 @@ def load_stock_map() -> dict:
             pass
     log.info(f"  Loaded {len(_stock_map)} stock mappings")
     return _stock_map
+
+# ---------------------------------------------------------------------------
+# Sponsor name → abbreviation (deterministic)
+# ---------------------------------------------------------------------------
+
+_sponsor_abbrev = None  # full_name → abbreviation
+
+def load_sponsor_abbrev() -> dict:
+    """Load the deterministic sponsor abbreviation table."""
+    global _sponsor_abbrev
+    if _sponsor_abbrev is not None:
+        return _sponsor_abbrev
+    _sponsor_abbrev = {}
+    # Try bundled JSON in repo root, then fallback to script directory
+    for path in [Path(__file__).parent / "sponsor_abbrev.json",
+                 Path("sponsor_abbrev.json")]:
+        if path.exists():
+            try:
+                data = json.loads(path.read_text())
+                _sponsor_abbrev = data.get("full_mapping", {})
+                log.info(f"  Loaded {len(_sponsor_abbrev)} sponsor abbreviations")
+                return _sponsor_abbrev
+            except Exception:
+                pass
+    log.warning("  sponsor_abbrev.json not found — sponsor tags disabled")
+    return _sponsor_abbrev
+
+def sponsors_to_tag(sponsor_names: list[str]) -> str:
+    """Convert list of sponsor full names to abbreviated tag: CICC_MS_GS."""
+    abbrevs = load_sponsor_abbrev()
+    if not abbrevs or not sponsor_names:
+        return ""
+    tags = []
+    for name in sponsor_names:
+        name_clean = name.strip()
+        # Try exact match first, then case-insensitive
+        tag = abbrevs.get(name_clean)
+        if not tag:
+            for k, v in abbrevs.items():
+                if k.lower() == name_clean.lower():
+                    tag = v
+                    break
+        if tag and tag not in tags:
+            tags.append(tag)
+    return "_".join(tags)
 
 # ---------------------------------------------------------------------------
 # Playwright search
@@ -755,6 +818,7 @@ def main():
 
     # 2. Load stock map
     stock_map = load_stock_map()
+    load_sponsor_abbrev()  # pre-load abbreviation table
 
     # 3. Search + download
     success = skip = fail = 0
@@ -768,6 +832,7 @@ def main():
             code = listing["stock_code"]
             company = listing["company"]
             prosp_date = listing["prospectus_date"]
+            sponsors = listing.get("sponsors", [])
             search_key = f"{code}_{prosp_date}"
 
             if search_key in state.get("searched", {}) and not args.stock:
@@ -825,10 +890,14 @@ def main():
             # Download
             safe_name = re.sub(r'[<>:"/\\|?*]', '_', company).strip()[:80]
             date_prefix = prosp_date.replace("-", "") if prosp_date else "00000000"
+            sponsor_tag = sponsors_to_tag(sponsors)
+            folder_name = f"{date_prefix}_{code}_{safe_name}"
+            if sponsor_tag:
+                folder_name += f"_{sponsor_tag}"
             for doc in pdf_docs:
                 url = doc["url"]
                 filename = url.split("/")[-1]
-                dest = DOWNLOAD_DIR / f"{date_prefix}_{code}_{safe_name}" / filename
+                dest = DOWNLOAD_DIR / folder_name / filename
                 if download_pdf(url, dest, state):
                     success += 1
 

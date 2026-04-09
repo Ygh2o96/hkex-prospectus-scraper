@@ -1,0 +1,1054 @@
+{
+  "description": "Deterministic sponsor abbreviation table. Joint sponsors: CICC_MS_GS. Same abbreviation always maps to same entity.",
+  "total_unique": 152,
+  "full_mapping": {
+    "Goldman Sachs (Asia) L.L.C": "GS",
+    "Goldman Sachs (Asia) LLC": "GS",
+    "Goldman Sachs (Aisa) L.L.C": "GS",
+    "Goldman Sachs (Asia) Limited": "GS",
+    "Morgan Stanley Asia Limited": "MS",
+    "Morgan Stanley & Co. International plc": "MS",
+    "Merrill Lynch (Asia Pacific) Limited": "ML",
+    "Merrill Lynch Far East Limited": "ML",
+    "Credit Suisse (Hong Kong) Limited": "CS",
+    "Credit Suisse (HK) Limited": "CS",
+    "Credit Suisse (Asia) Limited": "CS",
+    "J.P. Morgan Securities (Far East) Limited": "JPM",
+    "JP Morgan Securities (Far East) Limited": "JPM",
+    "J.P. Morgan Securities (Asia Pacific) Limited": "JPM",
+    "JP Morgan Securities (Asia Pacific) Limited": "JPM",
+    "UBS Securities Hong Kong Limited": "UBS",
+    "UBS AG, Hong Kong Branch": "UBS",
+    "Deutsche Bank AG": "DB",
+    "Deutsche Bank AG, Hong Kong Branch": "DB",
+    "Deutsche Bank AG, HK Branch": "DB",
+    "Deutsche Bank": "DB",
+    "Deutsche Securities Asia Limited": "DB",
+    "Citigroup Global Markets Asia Limited": "CITI",
+    "Citigroup Global Markets Limited": "CITI",
+    "BNP Paribas Securities (Asia) Limited": "BNPP",
+    "BNP Paribas Capital (Asia Pacific) Limited": "BNPP",
+    "Barclays Capital Asia Limited": "BARCLAYS",
+    "Nomura International (Hong Kong) Limited": "NOMURA",
+    "Macquarie Capital Limited": "MACQUARIE",
+    "Macquarie Capital Securities Limited": "MACQUARIE",
+    "Jefferies Hong Kong Limited": "JEFFERIES",
+    "Daiwa Capital Markets Hong Kong Limited": "DAIWA",
+    "DBS Asia Capital Limited": "DBS",
+    "Standard Chartered Securities (Hong Kong) Limited": "STANCHART",
+    "Rothschild (Hong Kong) Limited": "ROTHSCHILD",
+    "Mizuho Securities Asia Limited": "MIZUHO",
+    "The Royal Bank of Scotland N.V": "RBS",
+    "The Royal Bank of Scotland N.V. Hong Kong Branch": "RBS",
+    "Investec Capital Asia Limited": "INVESTEC",
+    "Piper Jaffray Asia Limited": "PIPER",
+    "HSBC Corporate Finance (Hong Kong) Limited": "HSBC",
+    "The Hongkong and Shanghai Banking Corporation Limited": "HSBC",
+    "China International Capital Corporation Hong Kong Securities Limited": "CICC",
+    "China International Capital Corporation HK Securities Limited": "CICC",
+    "China International Capital Corporation (Hong Kong) Limited": "CICC",
+    "China International Capital Corporation Hong Kong Limited": "CICC",
+    "China International Capital Corporation Hong Kong SecuritiesLimited": "CICC",
+    "China International Captial Corporation Hong Kong Securities Limited": "CICC",
+    "China International Capital Corporation": "CICC",
+    "ICBC International Capital Limited": "ICBCI",
+    "ICBC International Limited": "ICBCI",
+    "CCB International Capital Limited": "CCBI",
+    "BOCI Asia Limited": "BOCI",
+    "BOCOM International (Asia) Limited": "BOCOM",
+    "BOSC International Company Limited": "BOSC",
+    "CMB International Capital Limited": "CMBI",
+    "CMBC International Capital Limited": "CMBCI",
+    "CMBC Securities Company Limited": "CMBCI",
+    "China Merchants Securities (HK) Co., Limited": "CMS",
+    "China Everbright Capital Limited": "EVERBRIGHT",
+    "CEB International Capital Corporation Limited": "CEB",
+    "CITIC Securities (Hong Kong) Limited": "CITIC",
+    "CITIC Securities Corporate Finance (HK) Limited": "CITIC",
+    "CITIC CLSA Capital Markets Limited": "CITIC-CLSA",
+    "CLSA Capital Markets Limited": "CLSA",
+    "CLSA Equity Capital Markets Limited": "CLSA",
+    "Haitong International Capital Limited": "HAITONG",
+    "Hai Tong Capital (HK) Limited": "HAITONG",
+    "Guotai Junan Capital Limited": "GTJA",
+    "China Galaxy International Securities (Hong Kong) Co., Limited": "GALAXY",
+    "China Galaxy International Securities (Hong Kong) Co, Limited": "GALAXY",
+    "Shenwan Hongyuan Capital (H.K.) Limited": "SWS",
+    "Shenyin Wanguo Capital (H.K.) Limited": "SWS",
+    "Shenyin Wanguo Capital (HK) Limited": "SWS",
+    "Cinda International Capital Limited": "CINDA",
+    "Huatai Financial Holdings (Hong Kong) Limited": "HUATAI",
+    "China Renaissance Securities (Hong Kong) Limited": "HUAXING",
+    "China Securities (International) Corporate Finance Company Limited": "CSI",
+    "China Securities (International) Corporate Finance Co. Limited": "CSI",
+    "China Securities (International) Corporate Finance Co Limited": "CSI",
+    "China Industrial Securities International Capital Limited": "XYZQ",
+    "China Investment Securities International Capital Limited": "CIS",
+    "Ping An of China Capital (Hong Kong) Company Limited": "PINGAN",
+    "SPDB International Capital Limited": "SPDB",
+    "GF Capital (Hong Kong) Limited": "GF",
+    "Soochow Securities International Capital Limited": "SOOCHOW",
+    "Central China International Capital Limited": "CCNEW",
+    "Guosen Securities (HK) Capital Company Limited": "GUOSEN",
+    "Guosen Securities (HK) Capital Co., Limited": "GUOSEN",
+    "Dongxing Securities (Hong Kong) Company Limited": "DONGXING",
+    "Dongxing Securities (Hong Kong) Co Limited": "DONGXING",
+    "Changjiang Corporate Finance (HK) Limited": "CHANGJIANG",
+    "Zhongtai International Capital Limited": "ZHONGTAI",
+    "South China Capital Limited": "SCAP",
+    "Southwest Securities (HK) Capital Limited": "SWSC",
+    "Founder Securities (Hong Kong) Capital Company Limited": "FOUNDER",
+    "China Tonghai Capital Limited": "TONGHAI",
+    "Yue Xiu Capital Limited": "YUEXIU",
+    "Huarong International Capital Limited": "HUARONG",
+    "Huajin Corporate Finance (International) Limited": "HUAJIN",
+    "China Sunrise Capital Limited": "SUNRISE",
+    "Sinolink Securities (Hong Kong) Company Limited": "SINOLINK",
+    "Qilu International Capital Limited": "QILU",
+    "Caitong International Capital Co., Limited": "CAITONG",
+    "Guoyuan Capital (Hong Kong) Limited": "GUOYUAN",
+    "ABCI Capital Limited": "ABCI",
+    "ABCI Securities Company Limited": "ABCI",
+    "Ample Capital Limited": "AMPLE",
+    "Alliance Capital Partners Limited": "ALLIANCE",
+    "Anglo Chinese Corporate Finance, Limited": "ANGLO",
+    "Advent Corporate Finance Limited": "ADVENT",
+    "Alpha Financial Group Limited": "ALPHA",
+    "Altus Capital Limited": "ALTUS",
+    "Asian Capital (Corporate Finance) Limited": "ASIANCAP",
+    "Access Capital Limited": "ACCESS",
+    "Ballas Capital Limited": "BALLAS",
+    "Baron Global Financial Services Limited": "BARON",
+    "Capital 9 Limited": "CAP9",
+    "Celestial Capital Limited": "CELESTIAL",
+    "CLC International Limited": "CLC",
+    "CIMB Securities (HK) Limited": "CIMB",
+    "CIMB Securities Limited": "CIMB",
+    "Crosby Securities Limited": "CROSBY",
+    "Dakin Capital Limited": "DAKIN",
+    "Eddid Capital Limited": "EDDID",
+    "Elstone Capital Limited": "ELSTONE",
+    "Emperor Capital Limited": "EMPEROR",
+    "Emperor Corporate Finance Limited": "EMPEROR",
+    "Essence Corporate Finance (Hong Kong) Limited": "ESSENCE",
+    "Ever-Long Securities Company Limited": "EVERLONG",
+    "First Capital International Finance Limited": "FIRSTCAP",
+    "First Shanghai Capital Limited": "FIRSTSHG",
+    "Fortune Financial Capital Limited": "FORTUNE",
+    "Fosun Hani Securities Limited": "FOSUN",
+    "Frontpage Capital Limited": "FRONTPAGE",
+    "Giraffe Capital Limited": "GIRAFFE",
+    "Goldlink Capital (Corporate Finance) Limited": "GOLDLINK",
+    "Gram Capital Limited": "GRAM",
+    "Grand Moore Capital Limited": "GRANDMOORE",
+    "Grand Vinco Capital Limited": "GRANDVINCO",
+    "Grande Capital Limited": "GRANDE",
+    "Halcyon Capital Limited": "HALCYON",
+    "HeungKong Capital Limited": "HEUNGKONG",
+    "Honestum International Limited": "HONESTUM",
+    "Innovax Capital Limited": "INNOVAX",
+    "KGI Capital Asia Limited": "KGI",
+    "Kim Eng Securities (Hong Kong) Limited": "KIMENG",
+    "Kingston Corporate Finance Limited": "KINGSTON",
+    "Kingsway Capital Limited": "KINGSWAY",
+    "LY Capital Limited": "LY",
+    "Lego Corporate Finance Limited": "LEGO",
+    "Mason Global Capital Limited": "MASON",
+    "Maxa Capital Limited": "MAXA",
+    "Messis Capital Limited": "MESSIS",
+    "Mont Avenir Capital Limited": "MONTAVENIR",
+    "Octal Capital Limited": "OCTAL",
+    "Optima Capital Limited": "OPTIMA",
+    "Orient Capital (Hong Kong) Limited": "ORIENT",
+    "Oriental Patron Asia Limited": "OP",
+    "OSK Capital Hong Kong Limited": "OSK",
+    "Platinum Securities Company Limited": "PLATINUM",
+    "Polaris Securities (Hong Kong) Limited": "POLARIS",
+    "Quam Capital Limited": "QUAM",
+    "REORIENT Financial Markets Limited": "REORIENT",
+    "RHB Capital Hong Kong Limited": "RHB",
+    "RHB OSK Capital Hong Kong Limited": "RHB",
+    "RaffAello Capital Limited": "RAFFAELLO",
+    "Rainbow Capital (HK) Limited": "RAINBOW",
+    "Red Solar Capital Limited": "REDSOLAR",
+    "Red Sun Capital Limited": "REDSUN",
+    "Shanxi Securities International Capital Limited": "SHANXI",
+    "SinoPac Securities (Asia) Limited": "SINOPAC",
+    "Somerley Capital Limited": "SOMERLEY",
+    "Somerley Limited": "SOMERLEY",
+    "Sunfund Capital Limited": "SUNFUND",
+    "Sunny Fortune Capital Limited": "SUNNYFORT",
+    "TC Capital Asia Limited": "TC",
+    "TC Capital International Limited": "TC",
+    "TD King Capital Limited": "TDKING",
+    "TUS Corporate Finance Limited": "TUS",
+    "Titan Financial Services Limited": "TITAN",
+    "UOB Kay Hian (Hong Kong) Limited": "UOB",
+    "VBG Capital Limited": "VBG",
+    "VC Capital Limited": "VC",
+    "VMS Securities Limited": "VMS",
+    "Vinco Capital Limited": "VINCO",
+    "WAG Worldsec Corporate Finance Limited": "WAG",
+    "Yuanta Securities (Hong Kong) Co Limited": "YUANTA",
+    "Zero2IPO Capital Limited": "ZERO2IPO",
+    "Zijing Capital Limited": "ZIJING",
+    "豐盛融資有限公司": "FENGSHENG",
+    "UBS AG, Hong Kong Branch The Hongkong and Shanghai Banking Corporation Limited": "UBS",
+    "Deutsche Bank AG, Hong Kong Branch BOCI Asia Limited": "DEUTSCHE",
+    "UBS AG, Hong Kong Branch China International Capital Corporation Hong Kong Securities Limited": "UBS",
+    "Deutsche Bank AG, Hong Kong Branch BOCOM International (Asia) Limited": "DEUTSCHE",
+    "China International Capital Corporation Citigroup Global Markets Asia Limited": "CHINA",
+    "Normura International (Hong Kong) Limited": "NORMURA",
+    "Huatai Financial Holdings (Hong Kong)": "HUATAI",
+    "UBS AG, Hong Kong Branch Merrill Lynch Far East Limited": "UBS",
+    "Guotai Junan Securities (Hong Kong) Limited": "GUOTAI",
+    "TFI Capital Limited": "TFI",
+    "China International Capital Corporation China Galaxy International Securities (Hong Kong) Co., Limited": "CHINA",
+    "China International Capital Corporation Morgan Stanley Asia Limited": "CHINA"
+  },
+  "table": [
+    {
+      "abbreviation": "ABCI",
+      "canonical": "ABCI Securities Company Limited",
+      "variants": [
+        "ABCI Capital Limited"
+      ]
+    },
+    {
+      "abbreviation": "ACCESS",
+      "canonical": "Access Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ADVENT",
+      "canonical": "Advent Corporate Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ALLIANCE",
+      "canonical": "Alliance Capital Partners Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ALPHA",
+      "canonical": "Alpha Financial Group Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ALTUS",
+      "canonical": "Altus Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "AMPLE",
+      "canonical": "Ample Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ANGLO",
+      "canonical": "Anglo Chinese Corporate Finance, Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ASIANCAP",
+      "canonical": "Asian Capital (Corporate Finance) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BALLAS",
+      "canonical": "Ballas Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BARCLAYS",
+      "canonical": "Barclays Capital Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BARON",
+      "canonical": "Baron Global Financial Services Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BNPP",
+      "canonical": "BNP Paribas Capital (Asia Pacific) Limited",
+      "variants": [
+        "BNP Paribas Securities (Asia) Limited"
+      ]
+    },
+    {
+      "abbreviation": "BOCI",
+      "canonical": "BOCI Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BOCOM",
+      "canonical": "BOCOM International (Asia) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "BOSC",
+      "canonical": "BOSC International Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CAITONG",
+      "canonical": "Caitong International Capital Co., Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CAP9",
+      "canonical": "Capital 9 Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CCBI",
+      "canonical": "CCB International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CCNEW",
+      "canonical": "Central China International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CEB",
+      "canonical": "CEB International Capital Corporation Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CELESTIAL",
+      "canonical": "Celestial Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CHANGJIANG",
+      "canonical": "Changjiang Corporate Finance (HK) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CHINA",
+      "canonical": "China International Capital Corporation China Galaxy International Securities (Hong Kong) Co., Limited",
+      "variants": [
+        "China International Capital Corporation Citigroup Global Markets Asia Limited",
+        "China International Capital Corporation Morgan Stanley Asia Limited"
+      ]
+    },
+    {
+      "abbreviation": "CICC",
+      "canonical": "China International Capital Corporation Hong Kong Securities Limited",
+      "variants": [
+        "China International Capital Corporation",
+        "China International Capital Corporation (Hong Kong) Limited",
+        "China International Capital Corporation HK Securities Limited",
+        "China International Capital Corporation Hong Kong Limited",
+        "China International Capital Corporation Hong Kong SecuritiesLimited",
+        "China International Captial Corporation Hong Kong Securities Limited"
+      ]
+    },
+    {
+      "abbreviation": "CIMB",
+      "canonical": "CIMB Securities (HK) Limited",
+      "variants": [
+        "CIMB Securities Limited"
+      ]
+    },
+    {
+      "abbreviation": "CINDA",
+      "canonical": "Cinda International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CIS",
+      "canonical": "China Investment Securities International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CITI",
+      "canonical": "Citigroup Global Markets Asia Limited",
+      "variants": [
+        "Citigroup Global Markets Limited"
+      ]
+    },
+    {
+      "abbreviation": "CITIC",
+      "canonical": "CITIC Securities Corporate Finance (HK) Limited",
+      "variants": [
+        "CITIC Securities (Hong Kong) Limited"
+      ]
+    },
+    {
+      "abbreviation": "CITIC-CLSA",
+      "canonical": "CITIC CLSA Capital Markets Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CLC",
+      "canonical": "CLC International Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CLSA",
+      "canonical": "CLSA Equity Capital Markets Limited",
+      "variants": [
+        "CLSA Capital Markets Limited"
+      ]
+    },
+    {
+      "abbreviation": "CMBCI",
+      "canonical": "CMBC International Capital Limited",
+      "variants": [
+        "CMBC Securities Company Limited"
+      ]
+    },
+    {
+      "abbreviation": "CMBI",
+      "canonical": "CMB International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CMS",
+      "canonical": "China Merchants Securities (HK) Co., Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CROSBY",
+      "canonical": "Crosby Securities Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "CS",
+      "canonical": "Credit Suisse (Hong Kong) Limited",
+      "variants": [
+        "Credit Suisse (Asia) Limited",
+        "Credit Suisse (HK) Limited"
+      ]
+    },
+    {
+      "abbreviation": "CSI",
+      "canonical": "China Securities (International) Corporate Finance Company Limited",
+      "variants": [
+        "China Securities (International) Corporate Finance Co Limited",
+        "China Securities (International) Corporate Finance Co. Limited"
+      ]
+    },
+    {
+      "abbreviation": "DAIWA",
+      "canonical": "Daiwa Capital Markets Hong Kong Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "DAKIN",
+      "canonical": "Dakin Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "DB",
+      "canonical": "Deutsche Bank AG, Hong Kong Branch",
+      "variants": [
+        "Deutsche Bank",
+        "Deutsche Bank AG",
+        "Deutsche Bank AG, HK Branch",
+        "Deutsche Securities Asia Limited"
+      ]
+    },
+    {
+      "abbreviation": "DBS",
+      "canonical": "DBS Asia Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "DEUTSCHE",
+      "canonical": "Deutsche Bank AG, Hong Kong Branch BOCOM International (Asia) Limited",
+      "variants": [
+        "Deutsche Bank AG, Hong Kong Branch BOCI Asia Limited"
+      ]
+    },
+    {
+      "abbreviation": "DONGXING",
+      "canonical": "Dongxing Securities (Hong Kong) Company Limited",
+      "variants": [
+        "Dongxing Securities (Hong Kong) Co Limited"
+      ]
+    },
+    {
+      "abbreviation": "EDDID",
+      "canonical": "Eddid Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ELSTONE",
+      "canonical": "Elstone Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "EMPEROR",
+      "canonical": "Emperor Corporate Finance Limited",
+      "variants": [
+        "Emperor Capital Limited"
+      ]
+    },
+    {
+      "abbreviation": "ESSENCE",
+      "canonical": "Essence Corporate Finance (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "EVERBRIGHT",
+      "canonical": "China Everbright Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "EVERLONG",
+      "canonical": "Ever-Long Securities Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FENGSHENG",
+      "canonical": "豐盛融資有限公司",
+      "variants": []
+    },
+    {
+      "abbreviation": "FIRSTCAP",
+      "canonical": "First Capital International Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FIRSTSHG",
+      "canonical": "First Shanghai Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FORTUNE",
+      "canonical": "Fortune Financial Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FOSUN",
+      "canonical": "Fosun Hani Securities Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FOUNDER",
+      "canonical": "Founder Securities (Hong Kong) Capital Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "FRONTPAGE",
+      "canonical": "Frontpage Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GALAXY",
+      "canonical": "China Galaxy International Securities (Hong Kong) Co., Limited",
+      "variants": [
+        "China Galaxy International Securities (Hong Kong) Co, Limited"
+      ]
+    },
+    {
+      "abbreviation": "GF",
+      "canonical": "GF Capital (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GIRAFFE",
+      "canonical": "Giraffe Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GOLDLINK",
+      "canonical": "Goldlink Capital (Corporate Finance) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GRAM",
+      "canonical": "Gram Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GRANDE",
+      "canonical": "Grande Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GRANDMOORE",
+      "canonical": "Grand Moore Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GRANDVINCO",
+      "canonical": "Grand Vinco Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GS",
+      "canonical": "Goldman Sachs (Asia) Limited",
+      "variants": [
+        "Goldman Sachs (Aisa) L.L.C",
+        "Goldman Sachs (Asia) L.L.C",
+        "Goldman Sachs (Asia) LLC"
+      ]
+    },
+    {
+      "abbreviation": "GTJA",
+      "canonical": "Guotai Junan Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GUOSEN",
+      "canonical": "Guosen Securities (HK) Capital Company Limited",
+      "variants": [
+        "Guosen Securities (HK) Capital Co., Limited"
+      ]
+    },
+    {
+      "abbreviation": "GUOTAI",
+      "canonical": "Guotai Junan Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "GUOYUAN",
+      "canonical": "Guoyuan Capital (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HAITONG",
+      "canonical": "Haitong International Capital Limited",
+      "variants": [
+        "Hai Tong Capital (HK) Limited"
+      ]
+    },
+    {
+      "abbreviation": "HALCYON",
+      "canonical": "Halcyon Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HEUNGKONG",
+      "canonical": "HeungKong Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HONESTUM",
+      "canonical": "Honestum International Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HSBC",
+      "canonical": "The Hongkong and Shanghai Banking Corporation Limited",
+      "variants": [
+        "HSBC Corporate Finance (Hong Kong) Limited"
+      ]
+    },
+    {
+      "abbreviation": "HUAJIN",
+      "canonical": "Huajin Corporate Finance (International) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HUARONG",
+      "canonical": "Huarong International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "HUATAI",
+      "canonical": "Huatai Financial Holdings (Hong Kong) Limited",
+      "variants": [
+        "Huatai Financial Holdings (Hong Kong)"
+      ]
+    },
+    {
+      "abbreviation": "HUAXING",
+      "canonical": "China Renaissance Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ICBCI",
+      "canonical": "ICBC International Capital Limited",
+      "variants": [
+        "ICBC International Limited"
+      ]
+    },
+    {
+      "abbreviation": "INNOVAX",
+      "canonical": "Innovax Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "INVESTEC",
+      "canonical": "Investec Capital Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "JEFFERIES",
+      "canonical": "Jefferies Hong Kong Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "JPM",
+      "canonical": "J.P. Morgan Securities (Asia Pacific) Limited",
+      "variants": [
+        "J.P. Morgan Securities (Far East) Limited",
+        "JP Morgan Securities (Asia Pacific) Limited",
+        "JP Morgan Securities (Far East) Limited"
+      ]
+    },
+    {
+      "abbreviation": "KGI",
+      "canonical": "KGI Capital Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "KIMENG",
+      "canonical": "Kim Eng Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "KINGSTON",
+      "canonical": "Kingston Corporate Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "KINGSWAY",
+      "canonical": "Kingsway Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "LEGO",
+      "canonical": "Lego Corporate Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "LY",
+      "canonical": "LY Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "MACQUARIE",
+      "canonical": "Macquarie Capital Securities Limited",
+      "variants": [
+        "Macquarie Capital Limited"
+      ]
+    },
+    {
+      "abbreviation": "MASON",
+      "canonical": "Mason Global Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "MAXA",
+      "canonical": "Maxa Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "MESSIS",
+      "canonical": "Messis Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "MIZUHO",
+      "canonical": "Mizuho Securities Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ML",
+      "canonical": "Merrill Lynch (Asia Pacific) Limited",
+      "variants": [
+        "Merrill Lynch Far East Limited"
+      ]
+    },
+    {
+      "abbreviation": "MONTAVENIR",
+      "canonical": "Mont Avenir Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "MS",
+      "canonical": "Morgan Stanley & Co. International plc",
+      "variants": [
+        "Morgan Stanley Asia Limited"
+      ]
+    },
+    {
+      "abbreviation": "NOMURA",
+      "canonical": "Nomura International (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "NORMURA",
+      "canonical": "Normura International (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "OCTAL",
+      "canonical": "Octal Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "OP",
+      "canonical": "Oriental Patron Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "OPTIMA",
+      "canonical": "Optima Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ORIENT",
+      "canonical": "Orient Capital (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "OSK",
+      "canonical": "OSK Capital Hong Kong Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "PINGAN",
+      "canonical": "Ping An of China Capital (Hong Kong) Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "PIPER",
+      "canonical": "Piper Jaffray Asia Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "PLATINUM",
+      "canonical": "Platinum Securities Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "POLARIS",
+      "canonical": "Polaris Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "QILU",
+      "canonical": "Qilu International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "QUAM",
+      "canonical": "Quam Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "RAFFAELLO",
+      "canonical": "RaffAello Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "RAINBOW",
+      "canonical": "Rainbow Capital (HK) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "RBS",
+      "canonical": "The Royal Bank of Scotland N.V. Hong Kong Branch",
+      "variants": [
+        "The Royal Bank of Scotland N.V"
+      ]
+    },
+    {
+      "abbreviation": "REDSOLAR",
+      "canonical": "Red Solar Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "REDSUN",
+      "canonical": "Red Sun Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "REORIENT",
+      "canonical": "REORIENT Financial Markets Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "RHB",
+      "canonical": "RHB OSK Capital Hong Kong Limited",
+      "variants": [
+        "RHB Capital Hong Kong Limited"
+      ]
+    },
+    {
+      "abbreviation": "ROTHSCHILD",
+      "canonical": "Rothschild (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SCAP",
+      "canonical": "South China Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SHANXI",
+      "canonical": "Shanxi Securities International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SINOLINK",
+      "canonical": "Sinolink Securities (Hong Kong) Company Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SINOPAC",
+      "canonical": "SinoPac Securities (Asia) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SOMERLEY",
+      "canonical": "Somerley Capital Limited",
+      "variants": [
+        "Somerley Limited"
+      ]
+    },
+    {
+      "abbreviation": "SOOCHOW",
+      "canonical": "Soochow Securities International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SPDB",
+      "canonical": "SPDB International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "STANCHART",
+      "canonical": "Standard Chartered Securities (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SUNFUND",
+      "canonical": "Sunfund Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SUNNYFORT",
+      "canonical": "Sunny Fortune Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SUNRISE",
+      "canonical": "China Sunrise Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "SWS",
+      "canonical": "Shenwan Hongyuan Capital (H.K.) Limited",
+      "variants": [
+        "Shenyin Wanguo Capital (H.K.) Limited",
+        "Shenyin Wanguo Capital (HK) Limited"
+      ]
+    },
+    {
+      "abbreviation": "SWSC",
+      "canonical": "Southwest Securities (HK) Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "TC",
+      "canonical": "TC Capital International Limited",
+      "variants": [
+        "TC Capital Asia Limited"
+      ]
+    },
+    {
+      "abbreviation": "TDKING",
+      "canonical": "TD King Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "TFI",
+      "canonical": "TFI Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "TITAN",
+      "canonical": "Titan Financial Services Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "TONGHAI",
+      "canonical": "China Tonghai Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "TUS",
+      "canonical": "TUS Corporate Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "UBS",
+      "canonical": "UBS AG, Hong Kong Branch China International Capital Corporation Hong Kong Securities Limited",
+      "variants": [
+        "UBS AG, Hong Kong Branch",
+        "UBS AG, Hong Kong Branch Merrill Lynch Far East Limited",
+        "UBS AG, Hong Kong Branch The Hongkong and Shanghai Banking Corporation Limited",
+        "UBS Securities Hong Kong Limited"
+      ]
+    },
+    {
+      "abbreviation": "UOB",
+      "canonical": "UOB Kay Hian (Hong Kong) Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "VBG",
+      "canonical": "VBG Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "VC",
+      "canonical": "VC Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "VINCO",
+      "canonical": "Vinco Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "VMS",
+      "canonical": "VMS Securities Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "WAG",
+      "canonical": "WAG Worldsec Corporate Finance Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "XYZQ",
+      "canonical": "China Industrial Securities International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "YUANTA",
+      "canonical": "Yuanta Securities (Hong Kong) Co Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "YUEXIU",
+      "canonical": "Yue Xiu Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ZERO2IPO",
+      "canonical": "Zero2IPO Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ZHONGTAI",
+      "canonical": "Zhongtai International Capital Limited",
+      "variants": []
+    },
+    {
+      "abbreviation": "ZIJING",
+      "canonical": "Zijing Capital Limited",
+      "variants": []
+    }
+  ]
+}
